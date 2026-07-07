@@ -83,8 +83,9 @@ class GenChangelogEndToEndTest(unittest.TestCase):
                            capture_output=True, text=True, env=_clean_git_env())
         self.assertEqual(r.returncode, 0, r.stderr)
         cl = (d / "CHANGELOG.md").read_text()
-        self.assertIn("## [", cl)          # the version/date release heading (Fix 1)
-        self.assertIn("0.1.0", cl)         # the tag
+        import re
+        # the release heading carries BOTH the version and an ISO date: "## [<ver>] - YYYY-MM-DD"
+        self.assertRegex(cl, r"## \[[^\]]*0\.1\.0[^\]]*\] - \d{4}-\d{2}-\d{2}")
         self.assertIn("Features", cl)
         self.assertIn("Bug Fixes", cl)
         self.assertIn("add a thing", cl.lower())
