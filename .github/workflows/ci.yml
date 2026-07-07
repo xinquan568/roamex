@@ -20,7 +20,9 @@ jobs:
           while IFS= read -r f; do
             head -3 "$f" | grep -q 'SPDX-License-Identifier: Apache-2.0' \
               || { echo "::error file=$f::missing SPDX Apache-2.0 header"; missing=1; }
-          done < <(find roamex -type f \( -name '*.cc' -o -name '*.h' -o -name '*.mm' -o -name '*.gn' -o -name '*.gni' \))
+          # chromium_src/ holds full copies of upstream (BSD-licensed) files — they keep the
+          # upstream header; the Roamex delta's licensing is documented inside each override.
+          done < <(find roamex -type f \( -name '*.cc' -o -name '*.h' -o -name '*.mm' -o -name '*.gn' -o -name '*.gni' \) -not -path 'roamex/chromium_src/*')
           exit $missing
       - name: Build config sanity
         run: |
@@ -28,3 +30,5 @@ jobs:
           test -f roamex/BUILD.gn || { echo "::error::missing roamex/BUILD.gn"; exit 1; }
           echo "TODO(roam-5/roam-36): add 'gn format --dry-run' + the touched-target build+test once a"
           echo "Chromium checkout is available on the runner (self-hosted warm-cache tier, §12.6)."
+      - name: Hermetic tooling tests (roam-2 — no Chromium checkout needed)
+        run: python3 -m unittest discover -s roamex/build/tests -v

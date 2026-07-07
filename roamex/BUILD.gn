@@ -11,7 +11,10 @@ group("roamex") {
 
 # E0 hello-world unit test (roam-1 acceptance: "a trivial //roamex unit test runs").
 test("roamex_unittests") {
-  sources = [ "test/roamex_smoke_unittest.cc" ]
+  sources = [
+    "test/roamex_overlay_mechanism_unittest.cc",
+    "test/roamex_smoke_unittest.cc",
+  ]
   deps = [
     "//base",
     "//base/test:run_all_unittests",  # provides main() + base::TestSuite (inits FeatureList, AtExitManager)

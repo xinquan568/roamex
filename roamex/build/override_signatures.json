@@ -1,0 +1,6 @@
+{
+  "pin": "149.0.7827.201",
+  "signatures": {
+    "chrome/common/chrome_isolated_world_ids.h": "6b5384da3ab0cb04ff100b19b8981e8846d51d0d405acf595ccbaf048d1e219a"
+  }
+}

@@ -43,8 +43,8 @@ The overlay is `codes/roamex/roamex/` → it must appear as `src/roamex/` in the
 target must reference it (GN only loads `//roamex/BUILD.gn` if something depends on it):
 ```sh
 ln -s /abs/path/to/codes/roamex/roamex ~/chromium/src/roamex
-# The §12.4 top-level hook (confirmed): adds //roamex + //roamex:roamex_unittests to gn_all (is_mac).
-git -C ~/chromium/src apply /abs/path/to/codes/roamex/roamex/patches/0001-gn-all-add-roamex-targets.patch
+# Apply ALL managed patches (0001 gn_all wiring, 0002 chromium_src redirect, ...) — idempotent, fail-loud:
+python3 ~/chromium/src/roamex/build/apply_patches.py --chromium-src ~/chromium/src
 ```
 (A symlink keeps the git repo as the source of truth; a `gclient` custom-solution/DEPS entry is the
 alternative once the overlay stabilizes. The `patches/` entry becomes a `gclient` runhook later, §12.5.)
