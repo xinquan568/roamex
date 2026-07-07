@@ -12,9 +12,9 @@ import unittest
 CHECKS = pathlib.Path(__file__).resolve().parents[3] / "scripts" / "checks"
 
 
-def run_check(script, *args, stdin=None):
+def run_check(script, *args, stdin=None, cwd=None):
     return subprocess.run([sys.executable, str(CHECKS / script), *args],
-                          capture_output=True, text=True, input=stdin)
+                          capture_output=True, text=True, input=stdin, cwd=cwd)
 
 
 class TmpTree(unittest.TestCase):
@@ -76,9 +76,16 @@ class SecretScanTest(TmpTree):
         self.assertEqual(run_check("secret_scan.py", f).returncode, 0)
 
 
-    def test_allow_marker_suppresses(self):
-        f = self.write("x.py", "KEY = 'AKIAZ7XQ2WPL4NR8YT3D'  # roamex:allow-secret\n")
+    def test_allow_marker_honored_in_test_path(self):
+        f = self.write("roamex/build/tests/test_x.py",
+                       "KEY = 'AKIAZ7XQ2WPL4NR8YT3D'  # roamex:allow-secret\n")
         self.assertEqual(run_check("secret_scan.py", f).returncode, 0)
+
+    def test_allow_marker_ignored_in_normal_source(self):
+        # A normal source/config file cannot silence detection with the marker (abuse surface closed).
+        f = self.write("roamex/common/x.cc",
+                       "const char* K = \"AKIAZ7XQ2WPL4NR8YT3D\";  // roamex:allow-secret\n")
+        self.assertNotEqual(run_check("secret_scan.py", f).returncode, 0)
 
 
 class CommitMsgTest(TmpTree):
@@ -97,14 +104,52 @@ class CommitMsgTest(TmpTree):
             self.assertNotEqual(run_check("commit_msg.py", f).returncode, 0, bad)
 
 
+class PrePushDecisionTest(unittest.TestCase):
+    def _decision(self, environ):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "pre_push", str(CHECKS / "pre_push.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.gtest_decision(environ)
+
+    def test_skips_when_unset(self):
+        self.assertEqual(self._decision({})[0], "skip")
+
+    def test_skips_when_no_out_dir(self):
+        self.assertEqual(self._decision({"ROAMEX_CHROMIUM_SRC": "/nonexistent"})[0], "skip")
+
+    def test_runs_when_out_default_present(self):
+        d = pathlib.Path(tempfile.mkdtemp(prefix="roamex-fakesrc-"))
+        self.addCleanup(__import__("shutil").rmtree, d, ignore_errors=True)
+        (d / "out" / "Default").mkdir(parents=True)
+        action, src = self._decision({"ROAMEX_CHROMIUM_SRC": str(d)})
+        self.assertEqual(action, "run")
+        self.assertEqual(src, str(d))
+
+
 class OverlayStructureTest(TmpTree):
+    def check_rel(self, rel):
+        self.write(rel, "// SPDX-License-Identifier: Apache-2.0\nx\n" if rel.endswith((".cc", ".h"))
+                   else "diff\n")
+        return run_check("overlay_structure.py", rel, cwd=str(self.tmp))
+
     def test_bad_patch_name_rejected(self):
-        f = self.write("roamex/patches/bad name.patch", "diff\n")
-        self.assertNotEqual(run_check("overlay_structure.py", f).returncode, 0)
+        self.assertNotEqual(self.check_rel("roamex/patches/bad name.patch").returncode, 0)
 
     def test_good_patch_name_accepted(self):
-        f = self.write("roamex/patches/0005-ok.patch", "diff\n")
-        self.assertEqual(run_check("overlay_structure.py", f).returncode, 0)
+        self.assertEqual(self.check_rel("roamex/patches/0005-ok.patch").returncode, 0)
+
+    def test_our_file_at_upstream_path_rejected(self):
+        r = self.check_rel("chrome/browser/x.cc")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("upstream mirror path", r.stdout + r.stderr)
+
+    def test_our_file_under_chromium_src_accepted(self):
+        self.assertEqual(self.check_rel("roamex/chromium_src/chrome/browser/x.h").returncode, 0)
+
+    def test_additive_roamex_file_accepted(self):
+        self.assertEqual(self.check_rel("roamex/browser/x.cc").returncode, 0)
 
 
 if __name__ == "__main__":

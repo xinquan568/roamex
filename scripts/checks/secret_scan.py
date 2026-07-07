@@ -17,9 +17,20 @@ PATTERNS = [
 ]
 # Substrings that make a match a known-safe placeholder/example rather than a real secret.
 ALLOWLIST = ("EXAMPLE", "<your", "your-", "placeholder", "REPLACE", "dummy", "fake", "xxxx")
-# An explicit, review-visible per-line opt-out for legitimate fixtures/examples (e.g. the scanner's
-# own test data). Same idea as detect-secrets' `pragma: allowlist secret` / bandit's `nosec`.
+# An explicit, review-visible per-line opt-out — HONORED ONLY in approved suppression paths (test
+# fixtures + *.template), so a normal source/config change cannot silence detection and slip a real
+# credential past CI. Same idea as detect-secrets' pragma / bandit's nosec, but path-scoped.
 ALLOW_MARKER = "roamex:allow-secret"
+SUPPRESSIBLE_PATHS = ("roamex/build/tests/", "/tests/", "test_")  # fixtures
+SUPPRESSIBLE_SUFFIXES = (".template",)
+
+
+def _suppressible(path):
+    p = path.replace("\\", "/")
+    name = p.rsplit("/", 1)[-1]
+    return (any(s in p for s in SUPPRESSIBLE_PATHS)
+            or name.startswith("test_")
+            or any(p.endswith(suf) for suf in SUPPRESSIBLE_SUFFIXES))
 
 
 def main(argv):
@@ -29,8 +40,9 @@ def main(argv):
             text = pathlib.Path(path).read_text(errors="replace")
         except (FileNotFoundError, IsADirectoryError):
             continue
+        allow_here = _suppressible(path)
         for lineno, line in enumerate(text.splitlines(), 1):
-            if ALLOW_MARKER in line:
+            if allow_here and ALLOW_MARKER in line:
                 continue
             for name, pat in PATTERNS:
                 if pat.search(line) and not any(a.lower() in line.lower() for a in ALLOWLIST):
