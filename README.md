@@ -31,5 +31,5 @@ roamex/            the overlay (placed at src/roamex/ at build time)
   build/args/      GN arg files (reference.gn = unbranded default)
   app/             branding, packaging, Sparkle (M6)
   test/            fixtures + the E0 smoke test
-.github/workflows/ CI baseline (lint-only until the build machine lands, §12.6)
+.github/workflows/ CI (§12.6 tiers): per-PR lint+hermetic gate; capability-gated Chromium jobs (visible skips until roam-36); scheduled nightly; release posture bound to the protected `release` Environment
 ```
