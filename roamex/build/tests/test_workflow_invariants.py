@@ -75,6 +75,20 @@ class WorkflowInvariantsTest(unittest.TestCase):
                           "Chromium-dependent job lacks the capability gate")
             self.assertIn(FORK_CONDITION, block,
                           "Chromium-dependent PR job lacks the non-fork condition (R15)")
+            # Structural precedence (S8-1): comments don't count — the gate's run body must handle
+            # the fork path (writing enabled=false) BEFORE any path can write enabled=true.
+            code_lines = [l for l in block.splitlines() if not l.strip().startswith("#")]
+            code = "\n".join(code_lines)
+            fork_branch = code.find('if [ "$IS_FORK" = "true" ]')
+            self.assertNotEqual(fork_branch, -1,
+                                "gate run body must branch on IS_FORK (not merely mention it)")
+            enable_write = code.find("enabled=true")
+            self.assertNotEqual(enable_write, -1, "gate must be able to enable when appropriate")
+            self.assertLess(fork_branch, enable_write,
+                            "the fork check must precede the capability-enabled path (R15)")
+            fork_block = code[fork_branch:code.find("elif", fork_branch)]
+            self.assertIn("enabled=false", fork_block,
+                          "the fork branch must write enabled=false")
 
     def test_nightly_scheduled_and_gated(self):
         text = _read("nightly.yml")
@@ -91,9 +105,23 @@ class WorkflowInvariantsTest(unittest.TestCase):
         self.assertIsNotNone(text, "release.yml missing")
         self.assertIn("environment: release", text,
                       "release job must bind the protected Environment")
-        self.assertNotIn("pull_request", text, "release must not trigger on PRs")
-        self.assertIn('- "v*"', text, "release triggers on v* tags")
-        self.assertIn("workflow_dispatch", text, "manual dispatch allowed")
+        # Structural on:-block parsing (S8-2): triggers are ONLY push.tags v* + workflow_dispatch.
+        lines = text.splitlines()
+        on_start = next(i for i, l in enumerate(lines) if l.rstrip() == "on:")
+        on_block = []
+        for line in lines[on_start + 1:]:
+            if line.strip() and not line.startswith(" "):
+                break  # next top-level key ends the on: block
+            on_block.append(line)
+        on_text = "\n".join(on_block)
+        triggers = [l.strip().rstrip(":") for l in on_block
+                    if l.startswith("  ") and not l.startswith("   ") and l.strip().endswith(":")]
+        self.assertEqual(sorted(triggers), ["push", "workflow_dispatch"],
+                         f"release triggers must be exactly push+workflow_dispatch, got {triggers}")
+        self.assertIn("tags:", on_text, "release push trigger must be tag-scoped")
+        self.assertNotIn("branches", on_text, "release must not trigger on branch pushes")
+        tag_patterns = [l.strip().lstrip("- ").strip('"') for l in on_block if l.strip().startswith("- ")]
+        self.assertEqual(tag_patterns, ["v*"], f"release tags must be exactly v*, got {tag_patterns}")
 
     def test_workflows_carry_spdx(self):
         for wf in sorted(WORKFLOWS.glob("*.yml")):
