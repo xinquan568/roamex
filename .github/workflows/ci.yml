@@ -32,3 +32,29 @@ jobs:
           echo "Chromium checkout is available on the runner (self-hosted warm-cache tier, §12.6)."
       - name: Hermetic tooling tests (roam-2 — no Chromium checkout needed)
         run: python3 -m unittest discover -s roamex/build/tests -v
+  targeted-suite:
+    # ROAMEX_CHROMIUM_DEPENDENT: the per-PR Chromium half (§12.6 tier-1). Gated on BOTH capability
+    # (vars.ROAMEX_CI_CHROMIUM_RUNNER — unset until roam-36 provisions a warm-cache runner) AND trust
+    # (fork PRs stay lint-only even after provisioning — R15, the hard security boundary).
+    runs-on: macos-14
+    steps:
+      - name: Gate (capability + trust) — visible, never a silent green
+        id: gate
+        env:
+          CAP: ${{ vars.ROAMEX_CI_CHROMIUM_RUNNER }}
+          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        run: |
+          if [ "$IS_FORK" = "true" ]; then
+            echo "SKIPPED: fork PR — tier-1 (lint/unit) only, per §12.6/R15." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          elif [ -z "$CAP" ]; then
+            echo "SKIPPED: no capable Chromium runner provisioned (see roam-36 / I-0.6)." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build + run the targeted suite
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          echo "::error::capability variable is set but the targeted-suite build is not wired yet (roam-36)"
+          exit 1

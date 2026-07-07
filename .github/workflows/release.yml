@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Roamex release posture (roam-5 / §12.6 tier-3): secrets live ONLY in the protected `release`
+# Environment (gated to protected refs + v* tags). The signing/notarize/Sparkle steps land at M6
+# (roam-33..35); until then this job fails LOUDLY if invoked — the posture is real, the release
+# pipeline intentionally is not.
+name: release
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sign-notarize-publish:
+    runs-on: macos-14
+    environment: release
+    steps:
+      - name: Assert protected ref
+        run: |
+          case "${GITHUB_REF}" in
+            refs/tags/v*) echo "ref OK: ${GITHUB_REF}" ;;
+            *) echo "::error::release ran on a non-release ref: ${GITHUB_REF}"; exit 1 ;;
+          esac
+      - name: Signing / notarization / Sparkle (M6 placeholder)
+        run: |
+          echo "::error::release signing is not wired yet (M6: roam-33..35). This loud failure is deliberate."
+          exit 1
