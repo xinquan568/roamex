@@ -90,6 +90,11 @@ class TabInitialUrlHelper
   GURL initial_url_;
   bool captured_ = false;
   bool user_locked_ = false;
+  // Set by the restore path: at restore time the tab is not yet attached to a
+  // tracked session window, so SessionService::AddTabExtraData would be
+  // dropped. We re-persist on the first navigation once the window is tracked
+  // (Step-8 finding 1), guaranteeing a durable write under the new tab id.
+  bool pending_session_write_ = false;
 
   WEB_CONTENTS_USER_DATA_KEY_DECL();
 };

@@ -158,7 +158,8 @@ void TabInitialUrlHelper::SetRestoredInitialUrl(const GURL& url, bool locked) {
   initial_url_ = url;
   captured_ = true;
   user_locked_ = locked;
-  PersistToSession();
+  // Defer the session write until the restored tab is attached (below).
+  pending_session_write_ = true;
 }
 
 void TabInitialUrlHelper::PersistToSession() {
@@ -184,6 +185,13 @@ void TabInitialUrlHelper::DidFinishNavigation(
     content::NavigationHandle* navigation_handle) {
   // State gate.
   if (captured_ || user_locked_) {
+    // A restored value re-persists on its first post-attach navigation, when
+    // the session window is finally tracked (Step-8 finding 1).
+    if (pending_session_write_ && navigation_handle->IsInPrimaryMainFrame() &&
+        navigation_handle->HasCommitted()) {
+      pending_session_write_ = false;
+      PersistToSession();
+    }
     return;
   }
   // Frame/commit gates.

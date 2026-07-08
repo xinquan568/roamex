@@ -13,9 +13,12 @@ namespace roamex::tabs {
 
 namespace {
 
-// Menu-local command ids (own delegate; never collide with upstream's).
-constexpr int kEditInitialUrl = 1;
-constexpr int kSetInitialUrlToCurrentPage = 2;
+// Command ids in the roamex private high range (0005 uses 2101-2105). The
+// submenu id is what the parent menu sees; the item ids are resolved by this
+// model's own delegate.
+constexpr int kInitialUrlSubMenu = 2110;
+constexpr int kEditInitialUrl = 2111;
+constexpr int kSetInitialUrlToCurrentPage = 2112;
 
 bool CanSetToCurrentPage(content::WebContents* contents) {
   const GURL& url = contents->GetLastCommittedURL();
@@ -75,7 +78,7 @@ std::unique_ptr<ui::SimpleMenuModel> MaybeAppendInitialUrlSubMenu(
     return nullptr;
   }
   auto submenu = std::make_unique<InitialUrlMenuModel>(contents);
-  parent->AddSubMenu(/*command_id=*/-1, u"Initial URL", submenu.get());
+  parent->AddSubMenu(kInitialUrlSubMenu, u"Initial URL", submenu.get());
   return submenu;
 }
 

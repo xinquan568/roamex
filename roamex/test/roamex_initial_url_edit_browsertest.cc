@@ -20,7 +20,9 @@
 #include "roamex/browser/tabs/tab_initial_url_helper.h"
 #include "roamex/browser/tabs/tab_uid_tab_helper.h"
 #include "roamex/browser/ui/tabs/edit_initial_url_dialog.h"
+#include "roamex/browser/ui/tabs/initial_url_menu.h"
 #include "roamex/common/roamex_features.h"
+#include "ui/menus/simple_menu_model.h"
 
 namespace roamex {
 namespace {
@@ -149,6 +151,39 @@ IN_PROC_BROWSER_TEST_F(RoamexInitialUrlEditTest,
   }
 }
 
+IN_PROC_BROWSER_TEST_F(RoamexInitialUrlEditTest,
+                       SubMenuAppearsAndDrivesActions) {
+  // The submenu appears (flag on) and carries the two §4.5 actions.
+  ui::SimpleMenuModel parent(nullptr);
+  std::unique_ptr<ui::SimpleMenuModel> submenu =
+      tabs::MaybeAppendInitialUrlSubMenu(&parent, active_contents());
+  ASSERT_NE(nullptr, submenu);
+  ASSERT_EQ(2u, submenu->GetItemCount());
+
+  // On about:blank, "Set to current page" (index 1) is disabled…
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("about:blank")));
+  {
+    ui::SimpleMenuModel parent_blank(nullptr);
+    std::unique_ptr<ui::SimpleMenuModel> blank_menu =
+        tabs::MaybeAppendInitialUrlSubMenu(&parent_blank, active_contents());
+    ASSERT_NE(nullptr, blank_menu);
+    EXPECT_FALSE(blank_menu->IsEnabledAt(1));
+  }
+
+  // …and enabled on a real page, where activating it writes + locks.
+  const GURL page = embedded_test_server()->GetURL("/title1.html");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), page));
+  ui::SimpleMenuModel parent_live(nullptr);
+  std::unique_ptr<ui::SimpleMenuModel> live_menu =
+      tabs::MaybeAppendInitialUrlSubMenu(&parent_live, active_contents());
+  ASSERT_NE(nullptr, live_menu);
+  EXPECT_TRUE(live_menu->IsEnabledAt(1));
+  live_menu->ActivatedAt(1);  // ExecuteCommand(set-to-current) via the model.
+  ASSERT_TRUE(helper()->has_initial_url());
+  EXPECT_EQ(page, helper()->initial_url());
+  EXPECT_TRUE(helper()->is_user_locked());
+}
+
 class RoamexInitialUrlEditFlagOffTest : public InProcessBrowserTest {
  public:
   RoamexInitialUrlEditFlagOffTest() {
@@ -166,6 +201,13 @@ IN_PROC_BROWSER_TEST_F(RoamexInitialUrlEditFlagOffTest, NoHelperWhenFlagOff) {
   EXPECT_FALSE(
       tabs::SubmitEditInitialUrlForTesting(contents, "https://edited.test/"));
   EXPECT_EQ(nullptr, tabs::TabInitialUrlHelper::FromWebContents(contents));
+}
+
+IN_PROC_BROWSER_TEST_F(RoamexInitialUrlEditFlagOffTest, NoSubmenuWhenFlagOff) {
+  ui::SimpleMenuModel parent(nullptr);
+  EXPECT_EQ(nullptr,
+            tabs::MaybeAppendInitialUrlSubMenu(
+                &parent, browser()->tab_strip_model()->GetActiveWebContents()));
 }
 
 }  // namespace

@@ -39,6 +39,47 @@ class RoamexInitialUrlRestoreTest : public InProcessBrowserTest {
   base::test::ScopedFeatureList features_;
 };
 
+// Two-hop (Step-8 finding 1): the value must survive a SECOND restart, which
+// only holds if the restore path re-persisted under the new tab id.
+IN_PROC_BROWSER_TEST_F(RoamexInitialUrlRestoreTest,
+                       PRE_PRE_TwoHopRestartKeepsEditedValue) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL("/title1.html")));
+  content::WebContents* contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(
+      tabs::SubmitEditInitialUrlForTesting(contents, "https://edited.test/"));
+}
+
+IN_PROC_BROWSER_TEST_F(RoamexInitialUrlRestoreTest,
+                       PRE_TwoHopRestartKeepsEditedValue) {
+  // First restart: the restore path re-persists on the first navigation.
+  TabStripModel* tab_strip = browser()->tab_strip_model();
+  for (int i = 0; i < tab_strip->count(); ++i) {
+    ASSERT_TRUE(content::WaitForLoadStop(tab_strip->GetWebContentsAt(i)));
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(RoamexInitialUrlRestoreTest,
+                       TwoHopRestartKeepsEditedValue) {
+  // Second restart: the value is still present, proving the re-persist held.
+  TabStripModel* tab_strip = browser()->tab_strip_model();
+  tabs::TabInitialUrlHelper* helper = nullptr;
+  for (int i = 0; i < tab_strip->count(); ++i) {
+    ASSERT_TRUE(content::WaitForLoadStop(tab_strip->GetWebContentsAt(i)));
+    tabs::TabInitialUrlHelper* candidate =
+        tabs::TabInitialUrlHelper::FromWebContents(
+            tab_strip->GetWebContentsAt(i));
+    if (candidate && candidate->has_initial_url()) {
+      helper = candidate;
+      break;
+    }
+  }
+  ASSERT_NE(nullptr, helper) << "the edited value did not survive two restarts";
+  EXPECT_EQ(GURL("https://edited.test/"), helper->initial_url());
+  EXPECT_TRUE(helper->is_user_locked());
+}
+
 IN_PROC_BROWSER_TEST_F(RoamexInitialUrlRestoreTest,
                        PRE_RestartRestoresEditedValue) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
