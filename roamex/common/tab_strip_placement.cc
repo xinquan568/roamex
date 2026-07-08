@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "roamex/common/tab_strip_placement.h"
 
+#include <algorithm>
+
 #include "base/feature_list.h"
 #include "components/prefs/pref_service.h"
 #include "roamex/common/roamex_features.h"
@@ -28,6 +30,18 @@ void SetTabStripPlacement(PrefService* pref_service,
   }
   pref_service->SetInteger(prefs::kTabStripPosition,
                            static_cast<int>(placement));
+}
+
+BottomStripLayout ComputeBottomStripLayout(const gfx::Rect& client_area,
+                                           int strip_height) {
+  const int height = std::clamp(strip_height, 0, client_area.height());
+  BottomStripLayout result;
+  result.strip = gfx::Rect(client_area.x(), client_area.bottom() - height,
+                           client_area.width(), height);
+  result.remaining =
+      gfx::Rect(client_area.x(), client_area.y(), client_area.width(),
+                client_area.height() - height);
+  return result;
 }
 
 }  // namespace roamex

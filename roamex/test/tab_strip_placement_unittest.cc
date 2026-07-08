@@ -73,3 +73,41 @@ TEST_F(TabStripPlacementTest, NullPrefServiceReadsTop) {
 
 }  // namespace
 }  // namespace roamex
+
+// roam-7 (I-1.2): the bottom-band geometry helper (TDD: RED before the
+// implementation).
+#include "ui/gfx/geometry/rect.h"
+
+namespace roamex {
+namespace {
+
+TEST(ComputeBottomStripLayoutTest, CarvesBottomBandOfStripHeight) {
+  const gfx::Rect client(0, 0, 1200, 800);
+  const BottomStripLayout result = ComputeBottomStripLayout(client, 40);
+  EXPECT_EQ(gfx::Rect(0, 760, 1200, 40), result.strip);
+  EXPECT_EQ(gfx::Rect(0, 0, 1200, 760), result.remaining);
+}
+
+TEST(ComputeBottomStripLayoutTest, HonorsClientOrigin) {
+  const gfx::Rect client(10, 20, 600, 400);
+  const BottomStripLayout result = ComputeBottomStripLayout(client, 50);
+  EXPECT_EQ(gfx::Rect(10, 370, 600, 50), result.strip);
+  EXPECT_EQ(gfx::Rect(10, 20, 600, 350), result.remaining);
+}
+
+TEST(ComputeBottomStripLayoutTest, ClampsOversizedStripToClientHeight) {
+  const gfx::Rect client(0, 0, 300, 30);
+  const BottomStripLayout result = ComputeBottomStripLayout(client, 50);
+  EXPECT_EQ(gfx::Rect(0, 0, 300, 30), result.strip);
+  EXPECT_EQ(gfx::Rect(0, 0, 300, 0), result.remaining);
+}
+
+TEST(ComputeBottomStripLayoutTest, NegativeStripHeightYieldsEmptyBand) {
+  const gfx::Rect client(0, 0, 300, 200);
+  const BottomStripLayout result = ComputeBottomStripLayout(client, -5);
+  EXPECT_EQ(gfx::Rect(0, 200, 300, 0), result.strip);
+  EXPECT_EQ(client, result.remaining);
+}
+
+}  // namespace
+}  // namespace roamex

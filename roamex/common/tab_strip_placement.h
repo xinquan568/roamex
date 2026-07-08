@@ -2,6 +2,8 @@
 #ifndef ROAMEX_COMMON_TAB_STRIP_PLACEMENT_H_
 #define ROAMEX_COMMON_TAB_STRIP_PLACEMENT_H_
 
+#include "ui/gfx/geometry/rect.h"
+
 class PrefService;
 
 namespace roamex {
@@ -25,6 +27,18 @@ TabStripPlacement GetTabStripPlacement(const PrefService* pref_service);
 // Persists `placement`. No-op when `pref_service` is null.
 void SetTabStripPlacement(PrefService* pref_service,
                           TabStripPlacement placement);
+
+// The bottom-docked strip band (roam-7 / I-1.2): `strip` is the band carved
+// off the bottom of `client_area`; `remaining` is everything above it.
+struct BottomStripLayout {
+  gfx::Rect strip;
+  gfx::Rect remaining;
+};
+
+// Splits `client_area` into a bottom band of `strip_height` (clamped to
+// [0, client_area.height()]) and the remaining area above it.
+BottomStripLayout ComputeBottomStripLayout(const gfx::Rect& client_area,
+                                           int strip_height);
 
 }  // namespace roamex
 

@@ -5,6 +5,8 @@
 
 source_set("tabs") {
   sources = [
+    "tab_strip_placement_observer.cc",
+    "tab_strip_placement_observer.h",
     "tab_strip_position_menu.cc",
     "tab_strip_position_menu.h",
   ]

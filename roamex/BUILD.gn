@@ -32,6 +32,7 @@ test("roamex_unittests") {
     "test/roamex_overlay_mechanism_unittest.cc",
     "test/roamex_prefs_unittest.cc",
     "test/roamex_smoke_unittest.cc",
+    "test/tab_strip_placement_observer_unittest.cc",
     "test/tab_strip_placement_unittest.cc",
     "test/tab_strip_position_menu_unittest.cc",
   ]
@@ -44,6 +45,7 @@ test("roamex_unittests") {
     "//roamex/browser/ui/tabs",
     "//roamex/common",
     "//testing/gtest",
+    "//ui/gfx:test_support",
     "//ui/menus",
   ]
 }
@@ -74,7 +76,10 @@ test("roamex_browser_unittests") {
 # CI runs it filtered (RoamexTabStripPosition*) per roamex/build/ci/tier2_job.sh.
 test("roamex_browsertests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "test/roamex_tab_strip_position_settings_browsertest.cc" ]
+  sources = [
+    "test/roamex_tab_strip_bottom_layout_browsertest.cc",
+    "test/roamex_tab_strip_position_settings_browsertest.cc",
+  ]
   deps = [
     "//base",
     "//base/test:test_support",
@@ -88,6 +93,8 @@ test("roamex_browsertests") {
     "//content/test:test_support",
     "//roamex/common",
     "//testing/gtest",
+    "//ui/gfx/geometry",
+    "//ui/views",
     "//url",
   ]
 }
