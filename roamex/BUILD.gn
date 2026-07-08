@@ -83,6 +83,7 @@ test("roamex_browsertests") {
   sources = [
     "test/roamex_frame_rtl_fullscreen_browsertest.cc",
     "test/roamex_initial_url_browsertest.cc",
+    "test/roamex_reload_initial_url_browsertest.mm",
     "test/roamex_tab_uid_browsertest.cc",
     "test/roamex_tab_strip_bottom_layout_browsertest.cc",
     "test/roamex_tab_strip_position_settings_browsertest.cc",
