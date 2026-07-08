@@ -35,5 +35,7 @@ runs manually / from the build gate.
 | `0009-tab-uid-hooks.patch` | *(amended, roam-14)* | sibling `TabInitialUrlHelper::PopulateExtraData` (close-time) and `SetPendingRestoredInitialUrl` (AddRestoredTab: reopen AND session restore) calls beside the uid ones — the initial URL rides roam-10's extra-data channels |
 | `0012-initial-url-edit-ui.patch` | **persistent** | the §4.5 edit surface (roam-14): the `DuplicateTabAt` inherit-value+lock hook (§4.2), the tab-menu `MaybeAppendInitialUrlSubMenu` (own delegate; "Edit initial URL…" dialog + "Set initial URL to current page"), and the `//chrome/browser/ui/tabs` `sources +=` for the menu/dialog files |
 
+| `0013-edge-chromium-importer.patch` | **persistent** | the ImporterList family (roam-15): `TYPE_EDGE_CHROMIUM` + `VISIT_SOURCE_EDGE_IMPORTED`, the IPC ImporterType range raise (both maxes), the `#if IS_MAC` `CreateImporterByType` case, the flag-gated macOS `DetectRoamexEdgeProfiles` (calls the pure `roamex::DetectEdgeSourceProfile`), the `in_process_importer_bridge` VisitSource map, the UMA bucket + `enums.xml` value 8, the `sql/histograms.xml` DatabaseTag, and the `chrome/utility` + `chrome/browser/importer` + `chrome/test` BUILD wiring |
+
 Each patch is **tiny, reviewed, and fails loudly on rebase**. Keep the surface minimal — it is the
 rebase-cost surface tracked by §7.6/§12.5; the authoritative hook inventory is plan **§12.2**.
