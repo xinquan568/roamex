@@ -20,6 +20,7 @@ class SsoTestServer {
 
   GURL dashboard_url() const;  // The URL the user "really opened".
   GURL landing_url() const;    // Where the chain commits.
+  GURL idp_page_url() const;   // A plain cross-origin page (no redirects).
 
  private:
   net::EmbeddedTestServer app_server_;

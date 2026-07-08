@@ -9,6 +9,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
 #include "content/public/test/navigation_simulator.h"
+#include "content/public/test/test_renderer_host.h"
 #include "roamex/common/roamex_features.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/page_transition_types.h"
@@ -89,6 +90,25 @@ TEST_F(TabInitialUrlHelperTest, RendererNavigationAfterRealStartIsSticky) {
   simulator->SetTransition(ui::PAGE_TRANSITION_LINK);
   simulator->Commit();
   EXPECT_EQ(GURL("https://user.test/"), helper()->initial_url());
+}
+
+TEST_F(TabInitialUrlHelperTest, SubframeNavigationIgnored) {
+  content::NavigationSimulator::NavigateAndCommitFromBrowser(
+      web_contents(), GURL("about:blank"));
+  content::RenderFrameHost* subframe =
+      content::RenderFrameHostTester::For(main_rfh())->AppendChild("child");
+  content::NavigationSimulator::NavigateAndCommitFromDocument(
+      GURL("https://subframe.test/"), subframe);
+  EXPECT_FALSE(helper()->has_initial_url());
+}
+
+TEST_F(TabInitialUrlHelperTest, NtpStartIsIgnorable) {
+  content::NavigationSimulator::NavigateAndCommitFromBrowser(
+      web_contents(), GURL("chrome://newtab/"));
+  EXPECT_FALSE(helper()->has_initial_url());
+  content::NavigationSimulator::NavigateAndCommitFromBrowser(
+      web_contents(), GURL("https://after-ntp.test/"));
+  EXPECT_EQ(GURL("https://after-ntp.test/"), helper()->initial_url());
 }
 
 TEST_F(TabInitialUrlHelperTest, SameDocumentIgnored) {

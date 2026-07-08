@@ -39,6 +39,9 @@ bool SsoTestServer::Start() {
         if (request.relative_url == "/login") {
           return Redirect(self->landing_url().spec());
         }
+        if (request.relative_url == "/idp_page") {
+          return Page("<html><body>idp page</body></html>");
+        }
         return nullptr;
       },
       this));
@@ -65,6 +68,10 @@ GURL SsoTestServer::dashboard_url() const {
 
 GURL SsoTestServer::landing_url() const {
   return app_server_.GetURL("/landing");
+}
+
+GURL SsoTestServer::idp_page_url() const {
+  return idp_server_.GetURL("/idp_page");
 }
 
 }  // namespace roamex::test
