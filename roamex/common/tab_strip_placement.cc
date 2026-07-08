@@ -32,6 +32,24 @@ void SetTabStripPlacement(PrefService* pref_service,
                            static_cast<int>(placement));
 }
 
+bool ShouldDisplayVerticalTabsForPlacement(const PrefService* pref_service) {
+  const TabStripPlacement placement = GetTabStripPlacement(pref_service);
+  return placement == TabStripPlacement::kLeft ||
+         placement == TabStripPlacement::kRight;
+}
+
+bool ShouldDockVerticalTabStripRight(const PrefService* pref_service) {
+  if (GetTabStripPlacement(pref_service) != TabStripPlacement::kRight) {
+    return false;
+  }
+  // Robust to contexts where the upstream pref is not registered.
+  const PrefService::Preference* upstream =
+      pref_service->FindPreference(kUpstreamVerticalTabsEnabledPref);
+  const bool upstream_on =
+      upstream && upstream->GetValue()->GetIfBool().value_or(false);
+  return !upstream_on;
+}
+
 BottomStripLayout ComputeBottomStripLayout(const gfx::Rect& client_area,
                                            int strip_height) {
   const int height = std::clamp(strip_height, 0, client_area.height());

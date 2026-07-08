@@ -40,6 +40,21 @@ struct BottomStripLayout {
 BottomStripLayout ComputeBottomStripLayout(const gfx::Rect& client_area,
                                            int strip_height);
 
+// Mirror of upstream prefs::kVerticalTabsEnabled (chrome/common/pref_names.h) —
+// //roamex/common cannot depend on //chrome. Roamex READS this pref, never
+// writes it.
+inline constexpr char kUpstreamVerticalTabsEnabledPref[] =
+    "vertical_tabs.enabled";
+
+// roam-8 (I-1.3): true when the roamex placement asks for a vertical strip
+// (kLeft/kRight, flag on) — OR-ed into the upstream display gate by patch 0008.
+bool ShouldDisplayVerticalTabsForPlacement(const PrefService* pref_service);
+
+// roam-8 (I-1.3): true when the vertical strip should dock at the RIGHT edge —
+// only when roamex-driven (placement kRight) and the upstream pref is not
+// explicitly on (the upstream pref keeps today's left dock).
+bool ShouldDockVerticalTabStripRight(const PrefService* pref_service);
+
 }  // namespace roamex
 
 #endif  // ROAMEX_COMMON_TAB_STRIP_PLACEMENT_H_

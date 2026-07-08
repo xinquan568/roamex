@@ -1,0 +1,191 @@
+diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
+index be1c5ca3b5..b43ca0a0a4 100644
+--- a/chrome/browser/ui/browser_window/internal/BUILD.gn
++++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
+@@ -12,6 +12,7 @@ source_set("internal") {
+     "profile_browser_collection.cc",
+   ]
+   deps = [
++    "//roamex/common",
+     "//base",
+     "//chrome/browser:browser_process",
+     "//chrome/browser:global_features",
+diff --git a/chrome/browser/ui/browser_window/internal/browser_window_features.cc b/chrome/browser/ui/browser_window/internal/browser_window_features.cc
+index 6aaf694106..34157ef829 100644
+--- a/chrome/browser/ui/browser_window/internal/browser_window_features.cc
++++ b/chrome/browser/ui/browser_window/internal/browser_window_features.cc
+@@ -79,6 +79,7 @@
+ #include "chrome/browser/ui/sync/browser_synced_window_delegate.h"
+ #include "chrome/browser/ui/tab_search_feature.h"
+ #include "chrome/browser/ui/tabs/features.h"
++#include "roamex/common/roamex_features.h"
+ #include "chrome/browser/ui/tabs/glic_actor_nudge_controller.h"
+ #include "chrome/browser/ui/tabs/projects/projects_panel_state_controller.h"
+ #include "chrome/browser/ui/tabs/saved_tab_groups/most_recent_shared_tab_update_store.h"
+@@ -348,7 +349,11 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
+           browser, tab_list_bridge_.get());
+     }
+ 
+-    if (tabs::IsVerticalTabsFeatureEnabled()) {
++    // Roamex (roam-8): the roamex tab-strip-position flag also needs the
++    // vertical-tabs state controller (display is decided later by
++    // ShouldDisplayVerticalTabs).
++    if (tabs::IsVerticalTabsFeatureEnabled() ||
++        base::FeatureList::IsEnabled(roamex::features::kTabStripPosition)) {
+       Browser* raw_browser = browser->GetBrowserForMigrationOnly();
+ 
+       std::optional<bool> restored_state_collapsed =
+diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
+index 9919d3a042..3de8a4b223 100644
+--- a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
++++ b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
+@@ -22,6 +22,8 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/tabs/features.h"
++#include "roamex/common/roamex_prefs.h"
++#include "roamex/common/tab_strip_placement.h"
+ #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
+ #include "chrome/browser/ui/views/interaction/browser_elements_views.h"
+ #include "chrome/common/pref_names.h"
+@@ -63,6 +65,15 @@ VerticalTabStripStateController::VerticalTabStripStateController(
+       base::BindRepeating(&VerticalTabStripStateController::OnModeChanged,
+                           base::Unretained(this)));
+ 
++  // Roamex (roam-8): placement left/right rides the same mode-change
++  // pipeline, but only when the effective display mode actually flips.
++  pref_change_registrar_.Add(
++      roamex::prefs::kTabStripPosition,
++      base::BindRepeating(
++          &VerticalTabStripStateController::OnRoamexPlacementChanged,
++          base::Unretained(this)));
++  roamex_last_display_vertical_ = ShouldDisplayVerticalTabs();
++
+   if (IsVerticalTabsExpandOnHoverFeatureEnabled()) {
+     is_expand_on_hover_enabled_ =
+         pref_service_->GetBoolean(prefs::kVerticalTabsExpandOnHoverEnabled);
+@@ -174,7 +185,11 @@ void VerticalTabStripStateController::SetDelegate(Delegate* delegate) {
+ }
+ 
+ bool VerticalTabStripStateController::ShouldDisplayVerticalTabs() const {
+-  return IsVerticalTabsFeatureEnabled() && is_vertical_tabs_enabled_;
++  // Roamex (roam-8): placement left/right also displays the strip (flag-gated
++  // by roamex::kTabStripPosition; deliberately independent of the upstream
++  // feature flags, which are disabled-by-default at this pin).
++  return (IsVerticalTabsFeatureEnabled() && is_vertical_tabs_enabled_) ||
++         roamex::ShouldDisplayVerticalTabsForPlacement(pref_service_);
+ }
+ 
+ void VerticalTabStripStateController::SetVerticalTabsEnabled(bool enabled) {
+@@ -298,9 +313,22 @@ void VerticalTabStripStateController::OnModeChanged() {
+   is_vertical_tabs_enabled_ =
+       pref_service_->GetBoolean(prefs::kVerticalTabsEnabled);
+ 
++  // Roamex (roam-8): keep the cached display mode in sync on every real
++  // mode-change notification.
++  roamex_last_display_vertical_ = ShouldDisplayVerticalTabs();
++
+   NotifyModeChanged();
+ }
+ 
++void VerticalTabStripStateController::OnRoamexPlacementChanged() {
++  if (ShouldDisplayVerticalTabs() == roamex_last_display_vertical_) {
++    // Same display mode (e.g. top<->bottom or left<->right): no strip swap;
++    // layout updates ride the BrowserView-level placement observer.
++    return;
++  }
++  OnModeChanged();
++}
++
+ void VerticalTabStripStateController::OnExpandOnHoverEnabledChanged() {
+   is_expand_on_hover_enabled_ =
+       pref_service_->GetBoolean(prefs::kVerticalTabsExpandOnHoverEnabled);
+diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h
+index ae53c9d95a..34c6911dba 100644
+--- a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h
++++ b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h
+@@ -132,6 +132,9 @@ class VerticalTabStripStateController : public SessionServiceBaseObserver,
+   void NotifyModeChanged();
+ 
+   void OnModeChanged();
++  // Roamex (roam-8): fires the mode pipeline only when the effective display
++  // mode actually flips (placement changes within one mode are layout-only).
++  void OnRoamexPlacementChanged();
+   void OnExpandOnHoverEnabledChanged();
+ 
+   // Directly sets the collapse state.
+@@ -190,6 +193,9 @@ class VerticalTabStripStateController : public SessionServiceBaseObserver,
+   base::CallbackListSubscription did_become_active_subscription_;
+ 
+   bool is_vertical_tabs_enabled_ = false;
++  // Roamex (roam-8): last effective display mode, to suppress spurious strip
++  // re-initialization on placement changes that do not flip the mode.
++  bool roamex_last_display_vertical_ = false;
+   int enable_state_lock_count_ = 0;
+ 
+   bool is_expand_on_hover_enabled_ = false;
+diff --git a/chrome/browser/ui/tabs/BUILD.gn b/chrome/browser/ui/tabs/BUILD.gn
+index 1477a4e..e5deeb3 100644
+--- a/chrome/browser/ui/tabs/BUILD.gn
++++ b/chrome/browser/ui/tabs/BUILD.gn
+@@ -481,6 +481,7 @@ if (!is_android) {
+     }
+ 
+     deps = [
++      "//roamex/common",
+       ":tab_group",
+       ":tab_model",
+       ":tab_strip",
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+index 3f3758f..582f3a8 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -730,8 +730,14 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+         last_vertical_tab_strip_width_ = vertical_tab_strip_width;
+       }
+ 
++      // Roamex (roam-8): dock at the right edge when the roamex placement
++      // drives the display (upstream pref keeps the leading dock).
++      const bool roamex_dock_right = roamex::ShouldDockVerticalTabStripRight(
++          browser()->profile()->GetPrefs());
+       vertical_tab_strip_bounds =
+-          gfx::Rect(params.visual_client_area.x(),
++          gfx::Rect(roamex_dock_right ? params.visual_client_area.right() -
++                                            vertical_tab_strip_width
++                                      : params.visual_client_area.x(),
+                     params.visual_client_area.y() +
+                         vertical_tab_strip_animation.top_offset,
+                     vertical_tab_strip_width,
+@@ -746,7 +752,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+       if (adjust_for_cracking) {
+         inset_amount -= 1;
+       }
+-      params.InsetHorizontal(inset_amount, /*leading=*/true);
++      params.InsetHorizontal(inset_amount, /*leading=*/!roamex_dock_right);
+ 
+       // Let the vertical tab strip animate out over the content.
+       if (vertical_tab_strip_animation.current_motion) {
+@@ -755,11 +761,19 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+                 TabStripAnimations::kExpand ||
+             vertical_tab_strip_animation.current_motion ==
+                 TabStripAnimations::kCollapse;
+-        unclipped_contents_region.Inset(gfx::Insets::TLBR(
+-            0, VerticalTabStripRegionView::kCollapsedWidth, 0, 0));
++        unclipped_contents_region.Inset(
++            roamex_dock_right
++                ? gfx::Insets::TLBR(
++                      0, 0, 0, VerticalTabStripRegionView::kCollapsedWidth)
++                : gfx::Insets::TLBR(
++                      0, VerticalTabStripRegionView::kCollapsedWidth, 0, 0));
+       } else {
+-        unclipped_contents_region.Inset(gfx::Insets::TLBR(
+-            0, horizontal_layout.vertical_tab_strip_width, 0, 0));
++        unclipped_contents_region.Inset(
++            roamex_dock_right
++                ? gfx::Insets::TLBR(
++                      0, 0, 0, horizontal_layout.vertical_tab_strip_width)
++                : gfx::Insets::TLBR(
++                      0, horizontal_layout.vertical_tab_strip_width, 0, 0));
+       }
+     }
+     layout.AddChild(views().vertical_tab_strip_region_view,
