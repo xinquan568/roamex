@@ -12,6 +12,10 @@ namespace roamex {
 // The numeric values are the persisted integers of prefs::kTabStripPosition —
 // the forward contract I-1.2/I-1.3/I-1.4 consume; never renumber (stored user
 // state depends on it).
+//
+// Placements name PHYSICAL window edges and are RTL-invariant (roam-9 D1):
+// kLeft is the visual left in every UI direction, matching the upstream
+// vertical strip's physical-left dock at this pin and the literal UI labels.
 enum class TabStripPlacement {
   kTop = 0,  // Chromium default (the registered pref default).
   kBottom = 1,
@@ -54,6 +58,12 @@ bool ShouldDisplayVerticalTabsForPlacement(const PrefService* pref_service);
 // only when roamex-driven (placement kRight) and the upstream pref is not
 // explicitly on (the upstream pref keeps today's left dock).
 bool ShouldDockVerticalTabStripRight(const PrefService* pref_service);
+
+// roam-9 (I-1.4): true when the vertical strip is roamex-driven onto the
+// physical LEFT edge (placement kLeft, upstream pref off). Placements are
+// physical and RTL-invariant (D1); layout code flips to logical coordinates
+// at the call site.
+bool ShouldDockVerticalTabStripLeft(const PrefService* pref_service);
 
 }  // namespace roamex
 

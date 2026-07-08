@@ -77,6 +77,7 @@ test("roamex_browser_unittests") {
 test("roamex_browsertests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
+    "test/roamex_frame_rtl_fullscreen_browsertest.cc",
     "test/roamex_tab_strip_bottom_layout_browsertest.cc",
     "test/roamex_tab_strip_position_settings_browsertest.cc",
     "test/roamex_vertical_strip_placement_browsertest.cc",

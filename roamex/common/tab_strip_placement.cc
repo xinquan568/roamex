@@ -50,6 +50,17 @@ bool ShouldDockVerticalTabStripRight(const PrefService* pref_service) {
   return !upstream_on;
 }
 
+bool ShouldDockVerticalTabStripLeft(const PrefService* pref_service) {
+  if (GetTabStripPlacement(pref_service) != TabStripPlacement::kLeft) {
+    return false;
+  }
+  const PrefService::Preference* upstream =
+      pref_service->FindPreference(kUpstreamVerticalTabsEnabledPref);
+  const bool upstream_on =
+      upstream && upstream->GetValue()->GetIfBool().value_or(false);
+  return !upstream_on;
+}
+
 BottomStripLayout ComputeBottomStripLayout(const gfx::Rect& client_area,
                                            int strip_height) {
   const int height = std::clamp(strip_height, 0, client_area.height());

@@ -211,7 +211,7 @@ index a0431bfa8d..1c91c38e32 100644
      // strip types create duplicate tab strips. Until that is resolved, disable
      // the ability to swap between tab strips while in immersive.
 diff --git a/chrome/browser/ui/tabs/BUILD.gn b/chrome/browser/ui/tabs/BUILD.gn
-index 1477a4e..e5deeb3 100644
+index 1477a4ea0b..e5deeb3bca 100644
 --- a/chrome/browser/ui/tabs/BUILD.gn
 +++ b/chrome/browser/ui/tabs/BUILD.gn
 @@ -481,6 +481,7 @@ if (!is_android) {
@@ -223,17 +223,26 @@ index 1477a4e..e5deeb3 100644
        ":tab_model",
        ":tab_strip",
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 3f3758f..582f3a8 100644
+index 3f3758fd03..9cc30e7035 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-@@ -730,8 +730,14 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -730,8 +730,23 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
          last_vertical_tab_strip_width_ = vertical_tab_strip_width;
        }
  
-+      // Roamex (roam-8): dock at the right edge when the roamex placement
-+      // drives the display (upstream pref keeps the leading dock).
-+      const bool roamex_dock_right = roamex::ShouldDockVerticalTabStripRight(
-+          browser()->profile()->GetPrefs());
++      // Roamex (roam-8/9): dock on the roamex placement's PHYSICAL side when
++      // the roamex placement drives the display (upstream pref keeps the
++      // stock leading dock). ProposedLayout coordinates are logical — they
++      // mirror under RTL — so the physical side flips here (roam-9 D1).
++      const PrefService* const roamex_prefs = browser()->profile()->GetPrefs();
++      const bool roamex_physical_right =
++          roamex::ShouldDockVerticalTabStripRight(roamex_prefs);
++      const bool roamex_physical_left =
++          roamex::ShouldDockVerticalTabStripLeft(roamex_prefs);
++      bool roamex_dock_right = false;
++      if (roamex_physical_right || roamex_physical_left) {
++        roamex_dock_right = roamex_physical_right != base::i18n::IsRTL();
++      }
        vertical_tab_strip_bounds =
 -          gfx::Rect(params.visual_client_area.x(),
 +          gfx::Rect(roamex_dock_right ? params.visual_client_area.right() -
@@ -242,7 +251,7 @@ index 3f3758f..582f3a8 100644
                      params.visual_client_area.y() +
                          vertical_tab_strip_animation.top_offset,
                      vertical_tab_strip_width,
-@@ -746,7 +752,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -746,7 +761,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
        if (adjust_for_cracking) {
          inset_amount -= 1;
        }
@@ -251,7 +260,7 @@ index 3f3758f..582f3a8 100644
  
        // Let the vertical tab strip animate out over the content.
        if (vertical_tab_strip_animation.current_motion) {
-@@ -755,11 +761,19 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -755,11 +770,19 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
                  TabStripAnimations::kExpand ||
              vertical_tab_strip_animation.current_motion ==
                  TabStripAnimations::kCollapse;
@@ -276,7 +285,7 @@ index 3f3758f..582f3a8 100644
      }
      layout.AddChild(views().vertical_tab_strip_region_view,
 diff --git a/chrome/browser/ui/tabs/tab_menu_model.cc b/chrome/browser/ui/tabs/tab_menu_model.cc
-index b933679..004535a 100644
+index b933679e4c..004535a3dd 100644
 --- a/chrome/browser/ui/tabs/tab_menu_model.cc
 +++ b/chrome/browser/ui/tabs/tab_menu_model.cc
 @@ -345,7 +345,11 @@ void TabMenuModel::Build(int index) {

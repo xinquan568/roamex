@@ -162,6 +162,18 @@ TEST_F(VerticalPlacementPredicateTest, RightDockOnlyWhenRoamexDriven) {
   EXPECT_FALSE(ShouldDockVerticalTabStripRight(&pref_service_));
 }
 
+TEST_F(VerticalPlacementPredicateTest, LeftDockOnlyWhenRoamexDriven) {
+  base::test::ScopedFeatureList features;
+  features.InitAndEnableFeature(features::kTabStripPosition);
+  SetTabStripPlacement(&pref_service_, TabStripPlacement::kLeft);
+  EXPECT_TRUE(ShouldDockVerticalTabStripLeft(&pref_service_));
+  pref_service_.SetBoolean(kUpstreamVerticalTabsEnabledPref, true);
+  EXPECT_FALSE(ShouldDockVerticalTabStripLeft(&pref_service_));
+  pref_service_.SetBoolean(kUpstreamVerticalTabsEnabledPref, false);
+  SetTabStripPlacement(&pref_service_, TabStripPlacement::kRight);
+  EXPECT_FALSE(ShouldDockVerticalTabStripLeft(&pref_service_));
+}
+
 TEST_F(VerticalPlacementPredicateTest,
        RightDockToleratesUnregisteredUpstreamPref) {
   base::test::ScopedFeatureList features;
