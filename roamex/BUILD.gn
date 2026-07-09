@@ -35,6 +35,7 @@ test("roamex_unittests") {
     "test/edge_local_storage_reader_unittest.cc",
     "test/edge_profile_reader_unittest.cc",
     "test/edge_secret_decryptor_unittest.mm",
+    "test/roamex_edge_import_driver_unittest.cc",
     "test/roamex_features_unittest.cc",
     "test/roamex_indexed_db_import_stage_unittest.cc",
     "test/roamex_overlay_mechanism_unittest.cc",
@@ -53,6 +54,7 @@ test("roamex_unittests") {
                                       # FeatureList, AtExitManager)
     "//base/test:test_support",
     "//components/prefs:test_support",
+    "//components/user_data_importer/common",
     "//crypto",
     "//roamex/browser/importer",
     "//roamex/browser/signin",
@@ -101,6 +103,7 @@ test("roamex_browsertests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
     "test/roamex_edge_import_coordinator_browsertest.cc",
+    "test/roamex_edge_import_driver_browsertest.cc",
     "test/roamex_frame_rtl_fullscreen_browsertest.cc",
     "test/roamex_indexed_db_import_browsertest.cc",
     "test/roamex_initial_url_browsertest.cc",
@@ -130,6 +133,7 @@ test("roamex_browsertests") {
     "//components/prefs",
     "//components/services/storage/privileged/mojom",
     "//components/services/storage/public/mojom",
+    "//components/user_data_importer/common",
     "//content/test:test_support",
     "//net:test_support",
     "//roamex/browser/importer",

@@ -18,6 +18,8 @@ source_set("importer") {
     "edge_secret_decryptor.mm",
     "roamex_edge_import_coordinator.cc",
     "roamex_edge_import_coordinator.h",
+    "roamex_edge_import_driver.cc",
+    "roamex_edge_import_driver.h",
     "roamex_indexed_db_import_stage.cc",
     "roamex_indexed_db_import_stage.h",
     "roamex_origin_storage_import_stage.cc",
