@@ -18,10 +18,13 @@ namespace roamex {
 // infeasible/unsafe).
 //
 // HARD preconditions (enforced by the import flow, not this stage): the source
-// Edge is not running (a live LevelDB is not a consistent snapshot), and the
+// Edge is not running (a live store is not a consistent snapshot), and the
 // destination IndexedDB is uninitialized (fresh profile). Copies are no-clobber
-// and truly atomic per store (stage to temp, publish both dirs, roll back on
-// any failure). Runs file I/O on a MayBlock thread pool.
+// and truly atomic per store: each origin's dirs are staged into a per-run
+// mkdtemp root inside IndexedDB/, then published by an intra-directory rename
+// into a path re-verified absent immediately beforehand (so publish can never
+// merge into or overwrite a live store), rolling back on any failure. Runs file
+// I/O on a MayBlock thread pool.
 class RoamexIndexedDbImportStage {
  public:
   RoamexIndexedDbImportStage(base::FilePath source_path,

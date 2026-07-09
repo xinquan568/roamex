@@ -35,6 +35,7 @@ test("roamex_unittests") {
     "test/roamex_smoke_unittest.cc",
     "test/edge_indexed_db_reader_unittest.cc",
     "test/edge_local_storage_reader_unittest.cc",
+    "test/roamex_indexed_db_import_stage_unittest.cc",
     "test/edge_profile_reader_unittest.cc",
     "test/edge_secret_decryptor_unittest.mm",
     "test/shortcut_registry_unittest.cc",

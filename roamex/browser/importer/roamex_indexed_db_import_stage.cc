@@ -8,7 +8,6 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
-#include "base/strings/string_number_conversions.h"
 #include "base/task/thread_pool.h"
 #include "roamex/browser/importer/edge_indexed_db_reader.h"
 
@@ -38,6 +37,17 @@ size_t CopyStores(base::FilePath source_path, base::FilePath dest_profile_dir) {
   if (!base::CreateDirectory(dest_idb)) {
     return 0;
   }
+  // A per-run unique staging root INSIDE IndexedDB/ (mkdtemp-backed, so it can
+  // never collide with a leftover temp from a crashed prior run, nor with a
+  // concurrent import). Staging here also guarantees the publish Move is an
+  // intra-directory rename on one filesystem — no cross-device copy fallback,
+  // so it can never merge into or overwrite a pre-existing final path.
+  base::FilePath staging_root;
+  if (!base::CreateTemporaryDirInDir(
+          dest_idb, FILE_PATH_LITERAL("roamex-idb-stage-"), &staging_root)) {
+    return 0;
+  }
+
   // Group the source store dirs by origin base.
   std::map<base::FilePath::StringType, std::vector<base::FilePath>> groups;
   for (const base::FilePath& store :
@@ -46,9 +56,8 @@ size_t CopyStores(base::FilePath source_path, base::FilePath dest_profile_dir) {
   }
 
   size_t count = 0;
-  int seq = 0;
   for (const auto& [origin, members] : groups) {
-    // no-clobber: never overwrite a live destination store for this origin.
+    // no-clobber (early skip): never touch an origin that already has a store.
     bool any_dest_exists = false;
     for (const base::FilePath& src : members) {
       if (base::PathExists(dest_idb.Append(src.BaseName()))) {
@@ -60,25 +69,28 @@ size_t CopyStores(base::FilePath source_path, base::FilePath dest_profile_dir) {
       continue;
     }
 
-    // Stage every member to a unique temp, then publish all; roll back
-    // everything (temps + any final path created) on ANY failure.
+    // Stage every member into the fresh, empty staging root (each target does
+    // not exist there, so CopyDirectory creates a clean copy — never merges).
     std::vector<std::pair<base::FilePath, base::FilePath>>
         staged;  // staging→final
-    std::vector<base::FilePath> published;
     bool ok = true;
     for (const base::FilePath& src : members) {
-      const base::FilePath staging = dest_idb.Append(
-          src.BaseName().value() + FILE_PATH_LITERAL(".roamex-tmp-") +
-          base::NumberToString(seq++).c_str());
+      const base::FilePath staging = staging_root.Append(src.BaseName());
       if (!base::CopyDirectory(src, staging, /*recursive=*/true)) {
         ok = false;
         break;
       }
       staged.emplace_back(staging, dest_idb.Append(src.BaseName()));
     }
+
+    // Publish: recheck EACH final path is absent immediately before the rename
+    // (closes the stage→publish TOCTOU); an intra-IndexedDB/ Move into a
+    // confirmed-absent target cannot merge or overwrite. Roll back only the
+    // paths WE created on ANY failure; unpublished temps are swept below.
+    std::vector<base::FilePath> published;
     if (ok) {
       for (const auto& [staging, final_path] : staged) {
-        if (!base::Move(staging, final_path)) {
+        if (base::PathExists(final_path) || !base::Move(staging, final_path)) {
           ok = false;
           break;
         }
@@ -86,9 +98,6 @@ size_t CopyStores(base::FilePath source_path, base::FilePath dest_profile_dir) {
       }
     }
     if (!ok) {
-      for (const auto& [staging, final_path] : staged) {
-        base::DeletePathRecursively(staging);
-      }
       for (const base::FilePath& p : published) {
         base::DeletePathRecursively(p);
       }
@@ -96,6 +105,7 @@ size_t CopyStores(base::FilePath source_path, base::FilePath dest_profile_dir) {
     }
     ++count;
   }
+  base::DeletePathRecursively(staging_root);  // sweep any unpublished temps.
   return count;
 }
 
