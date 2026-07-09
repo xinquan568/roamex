@@ -13,7 +13,10 @@
 #include "roamex/browser/tab_visit/settled_visit_journal_factory.h"
 #include "roamex/browser/tab_visit/settled_visit_journal_service.h"
 #include "roamex/browser/tab_visit/tab_visit_activation_class.h"
+#include "roamex/browser/tab_visit/tab_visit_traversal_coordinator.h"
+#include "roamex/browser/tab_visit/tab_visit_traversal_coordinator_factory.h"
 #include "roamex/browser/tab_visit/visit_url_filter.h"
+#include "roamex/browser/tabs/tab_uid_tab_helper.h"
 #include "roamex/common/roamex_features.h"
 #include "url/gurl.h"
 
@@ -66,6 +69,25 @@ void TabVisitObserverBridge::OnTabStripModelChanged(
   if (!new_contents) {
     return;
   }
+
+  // roam-25: while a traversal gesture previews tabs, the coordinator owns the
+  // single settle-commit — suppress the bridge's per-activation commit so a
+  // gesture yields exactly one append (§6.3).
+  TabVisitTraversalCoordinator* coordinator =
+      TabVisitTraversalCoordinatorFactory::GetForProfile(profile_);
+  if (coordinator && coordinator->IsTraversalActive()) {
+    return;
+  }
+
+  // A normal settled activation contributes the tab's durable uid to the
+  // traversal MRU commit-log (the ordering source, keyed by uid not URL).
+  if (coordinator) {
+    if (tabs::TabUidTabHelper* helper =
+            tabs::TabUidTabHelper::FromWebContents(new_contents)) {
+      coordinator->RecordSettledUid(helper->uid());
+    }
+  }
+
   const GURL& url = new_contents->GetLastCommittedURL();
   if (!IsRecordableVisitUrl(url)) {
     return;

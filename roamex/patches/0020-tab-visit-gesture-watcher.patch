@@ -1,0 +1,85 @@
+--- a/chrome/browser/ui/browser_window/public/browser_window_features.h
++++ b/chrome/browser/ui/browser_window/public/browser_window_features.h
+@@ -25,6 +25,11 @@
+ namespace tabs {
+ class GlicActorNudgeController;
+ }  // namespace tabs
++
++// Roamex (roam-25): the per-window E4 traversal gesture (settle) watcher.
++namespace roamex::tab_visit {
++class TabVisitGestureWatcher;
++}  // namespace roamex::tab_visit
+ 
+ class ActorUiWindowController;
+ class ContextHighlightWindowFeature;
+@@ -558,6 +563,11 @@
+ 
+   std::unique_ptr<FullscreenControlHost> fullscreen_control_host_;
+ 
++  // Roamex (roam-25): per-window E4 traversal gesture settle watcher (created
++  // only when kTabVisitNav is enabled).
++  std::unique_ptr<roamex::tab_visit::TabVisitGestureWatcher>
++      tab_visit_gesture_watcher_;
++
+   std::unique_ptr<InitialWebUIManager> initial_web_ui_manager_;
+ 
+   std::unique_ptr<InitialWebUIWindowMetricsManager>
+--- a/chrome/browser/ui/browser_window/internal/browser_window_features.cc
++++ b/chrome/browser/ui/browser_window/internal/browser_window_features.cc
+@@ -79,6 +79,7 @@
+ #include "chrome/browser/ui/sync/browser_synced_window_delegate.h"
+ #include "chrome/browser/ui/tab_search_feature.h"
+ #include "chrome/browser/ui/tabs/features.h"
++#include "roamex/browser/tab_visit/tab_visit_gesture_watcher.h"
+ #include "roamex/common/roamex_features.h"
+ #include "chrome/browser/ui/tabs/glic_actor_nudge_controller.h"
+ #include "chrome/browser/ui/tabs/projects/projects_panel_state_controller.h"
+@@ -605,6 +606,14 @@
+     // ready.
+     fullscreen_control_host_ = std::make_unique<FullscreenControlHost>(
+         browser_view, exclusive_access_manager_.get());
++  }
++
++  // Roamex (roam-25): the per-window E4 traversal gesture settle watcher
++  // (modifier-release-primary; the debounce fallback lives in the per-profile
++  // coordinator). Inert unless the feature is enabled.
++  if (base::FeatureList::IsEnabled(roamex::features::kTabVisitNav)) {
++    tab_visit_gesture_watcher_ =
++        std::make_unique<roamex::tab_visit::TabVisitGestureWatcher>(browser_);
+   }
+ 
+   // Features that are only enabled for normal browser windows (e.g. a window
+@@ -1124,6 +1133,9 @@
+   // Destroy fullscreen control host before exclusive access manager.
+   fullscreen_control_host_.reset();
+ 
++  // Roamex (roam-25): tear down the traversal gesture watcher with the window.
++  tab_visit_gesture_watcher_.reset();
++
+   pinned_toolbar_actions_ = nullptr;
+ 
+   // TODO(crbug.com/423956131): Update reset order once FindBarController is
+--- a/chrome/browser/ui/browser_window/internal/BUILD.gn
++++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
+@@ -48,6 +48,12 @@
+     ]
+   } else {
+     sources += [
++      # Roamex (roam-25): the per-window E4 traversal gesture watcher, owned by
++      # BrowserWindowFeatures (compiled into this target; needs views +
++      # BrowserWindowInterface). The per-profile coordinator it forwards to
++      # lives in //chrome/browser/ui/tabs (dep below).
++      "//roamex/browser/tab_visit/tab_visit_gesture_watcher.cc",
++      "//roamex/browser/tab_visit/tab_visit_gesture_watcher.h",
+       "browser_window_features.cc",
+       "browser_window_interface_iterator_non_android.cc",
+       "create_browser_window_non_android.cc",
+@@ -130,6 +136,8 @@
+       "//components/profile_metrics",
+       "//components/saved_tab_groups/public",
+       "//components/search",
++      "//roamex/browser/tab_visit",
++      "//ui/views",
+     ]
+ 
+     if (is_win || is_mac) {

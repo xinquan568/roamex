@@ -12,8 +12,14 @@ namespace {
 
 // Keep in sync with chrome/app/chrome_command_ids.h (patch 0010).
 constexpr int kIdcReloadInitialUrl = 34059;
+// Keep in sync with chrome/app/chrome_command_ids.h (roam-25 patch 0017).
+constexpr int kIdcTabVisitBack = 33010;
+constexpr int kIdcTabVisitForward = 33011;
 // kVK_ANSI_R.
 constexpr int kVkAnsiR = 0x0F;
+// kVK_ANSI_LeftBracket / kVK_ANSI_RightBracket.
+constexpr int kVkAnsiLeftBracket = 0x21;
+constexpr int kVkAnsiRightBracket = 0x1E;
 
 constexpr RoamexShortcut kShortcuts[] = {
     {kIdcReloadInitialUrl,
@@ -25,6 +31,25 @@ constexpr RoamexShortcut kShortcuts[] = {
       .ctrl = true,
       .opt = false,
       .keycode = kVkAnsiR}},
+    // roam-25 (I-4.5): E4 tab visit-order navigation. Ctrl+Cmd+[ / Ctrl+Cmd+].
+    {kIdcTabVisitBack,
+     "tab_visit_back",
+     "Tab visit back",
+     &features::kTabVisitNav,
+     {.cmd = true,
+      .shift = false,
+      .ctrl = true,
+      .opt = false,
+      .keycode = kVkAnsiLeftBracket}},
+    {kIdcTabVisitForward,
+     "tab_visit_forward",
+     "Tab visit forward",
+     &features::kTabVisitNav,
+     {.cmd = true,
+      .shift = false,
+      .ctrl = true,
+      .opt = false,
+      .keycode = kVkAnsiRightBracket}},
 };
 
 }  // namespace

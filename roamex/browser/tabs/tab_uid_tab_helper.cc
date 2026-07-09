@@ -56,7 +56,10 @@ WEB_CONTENTS_USER_DATA_KEY_IMPL(PendingRestoredTabUid);
 // static
 void TabUidTabHelper::MaybeCreateForTab(::tabs::TabInterface& tab,
                                         Profile* profile) {
-  if (!base::FeatureList::IsEnabled(features::kInitialUrl)) {
+  // roam-25 (I-4.5): E4 tab-visit navigation keys traversal on the durable uid,
+  // so the uid helper must exist under kTabVisitNav as well as kInitialUrl.
+  if (!base::FeatureList::IsEnabled(features::kInitialUrl) &&
+      !base::FeatureList::IsEnabled(features::kTabVisitNav)) {
     return;
   }
   content::WebContents* web_contents = tab.GetContents();
@@ -110,7 +113,10 @@ void TabUidTabHelper::PopulateExtraData(
 void TabUidTabHelper::SetPendingRestoredUid(
     content::WebContents* web_contents,
     const std::map<std::string, std::string>& extra_data) {
-  if (!base::FeatureList::IsEnabled(features::kInitialUrl)) {
+  // roam-25 (I-4.5): E4 tab-visit navigation keys traversal on the durable uid,
+  // so the uid helper must exist under kTabVisitNav as well as kInitialUrl.
+  if (!base::FeatureList::IsEnabled(features::kInitialUrl) &&
+      !base::FeatureList::IsEnabled(features::kTabVisitNav)) {
     return;
   }
   auto it = extra_data.find(kExtraDataKey);

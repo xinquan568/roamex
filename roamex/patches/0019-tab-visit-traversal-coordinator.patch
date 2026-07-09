@@ -1,0 +1,39 @@
+--- a/chrome/browser/ui/tabs/BUILD.gn
++++ b/chrome/browser/ui/tabs/BUILD.gn
+@@ -646,6 +646,17 @@
+       "//roamex/browser/tab_visit/tab_visit_observer_bridge_factory.cc",
+       "//roamex/browser/tab_visit/tab_visit_observer_bridge_factory.h",
+     ]
++
++    # Roamex (roam-25): the per-profile traversal coordinator + its factory (own
++    # the active gesture session; use BrowserWindowInterface, not Browser, so
++    # they stay in this target with the bridge that calls them). The pure
++    # traversal controller lives in //roamex/browser/tab_visit (dep above).
++    sources += [
++      "//roamex/browser/tab_visit/tab_visit_traversal_coordinator.cc",
++      "//roamex/browser/tab_visit/tab_visit_traversal_coordinator.h",
++      "//roamex/browser/tab_visit/tab_visit_traversal_coordinator_factory.cc",
++      "//roamex/browser/tab_visit/tab_visit_traversal_coordinator_factory.h",
++    ]
+   }
+ 
+   # This is a separate component to avoid possible circular deps.
+--- a/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
++++ b/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
+@@ -205,6 +205,7 @@
+ #include "chrome/browser/profiles/renderer_updater_factory.h"
+ #include "roamex/browser/tab_visit/settled_visit_journal_factory.h"
+ #include "roamex/browser/tab_visit/tab_visit_observer_bridge_factory.h"
++#include "roamex/browser/tab_visit/tab_visit_traversal_coordinator_factory.h"
+ #include "roamex/browser/tabs/tab_uid_service_factory.h"
+ #include "chrome/browser/push_messaging/push_messaging_service_factory.h"
+ #include "chrome/browser/reading_list/reading_list_model_factory.h"
+@@ -657,6 +658,8 @@
+   roamex::tab_visit::SettledVisitJournalFactory::GetInstance();
+   // Roamex (roam-23): eager tab-visit observer bridge (E4 tab-visit-nav).
+   roamex::tab_visit::TabVisitObserverBridgeFactory::GetInstance();
++  // Roamex (roam-25): eager per-profile tab-visit traversal coordinator.
++  roamex::tab_visit::TabVisitTraversalCoordinatorFactory::GetInstance();
+   // ---------------------------------------------------------------------------
+   // Redirect to those lists for factories that are part of those modules.
+   // Module specific registration functions:
