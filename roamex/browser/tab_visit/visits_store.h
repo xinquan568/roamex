@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,17 @@ struct VisitRow {
   int64_t id = 0;
   std::string url;
   base::Time visited_at;
+};
+
+// One persisted tab-state row (roam-22 / I-4.2), keyed by the durable
+// restore_key. These are the PERSISTED columns only — the volatile
+// liveSessionId/liveTabs are never stored here (the persisted-vs-volatile
+// split, J3).
+struct TabStateRow {
+  std::string restore_key;
+  bool closed = false;
+  int64_t window_id = 0;
+  std::string last_known_url;
 };
 
 // The writable, append-only SQLite `visits` store backing the settled-visit
@@ -59,11 +71,22 @@ class VisitsStore {
   // The number of retained visits.
   size_t RowCount();
 
+  // Inserts-or-replaces the persisted state for `row.restore_key` (mutable, not
+  // append-only). No-op if the store is not open.
+  void UpsertTabState(const TabStateRow& row);
+
+  // The persisted state for `restore_key`, or nullopt if absent/not open.
+  std::optional<TabStateRow> GetTabState(const std::string& restore_key);
+
+  // All persisted tab states (by restore_key).
+  std::vector<TabStateRow> ReadTabStates();
+
   bool is_open() const { return db_.is_open(); }
 
  private:
-  // Initializes the schema (MetaTable v1 + the `visits` table), razing a
-  // corrupt/incompatible database and retrying once.
+  // Initializes/migrates the schema (MetaTable, the `visits` table, and the
+  // `tab_state` sidecar), advancing an older journal to the current version. A
+  // corrupt/incompatible database is handled by the caller (Open recreates it).
   bool InitSchema();
 
   sql::Database db_;

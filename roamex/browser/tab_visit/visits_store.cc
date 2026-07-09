@@ -16,7 +16,10 @@ namespace {
 // tools/metrics/histograms/metadata/sql/histograms.xml (patch 0015).
 constexpr char kDatabaseTag[] = "RoamexSettledVisitJournal";
 
-constexpr int kCurrentVersion = 1;
+// v1 (roam-21): the `visits` table. v2 (roam-22): adds the `tab_state` sidecar.
+// Compatible version stays 1 — a v1 build can still open a v2 DB (it just
+// ignores the `tab_state` table).
+constexpr int kCurrentVersion = 2;
 constexpr int kCompatibleVersion = 1;
 
 int64_t ToStorage(base::Time t) {
@@ -50,18 +53,92 @@ bool VisitsStore::OpenInMemory() {
 }
 
 bool VisitsStore::InitSchema() {
-  static constexpr char kCreateTable[] =
+  static constexpr char kCreateVisits[] =
       "CREATE TABLE IF NOT EXISTS visits("
       "id INTEGER PRIMARY KEY AUTOINCREMENT,"
       "url TEXT NOT NULL,"
       "visited_at INTEGER NOT NULL)";
+  // The persisted tab-state sidecar (roam-22). Keyed by the durable
+  // restore_key; mutable (upsert). It deliberately has NO
+  // liveSessionId/liveTabs column — those are volatile, in-memory-only, and
+  // must never be persisted.
+  static constexpr char kCreateTabState[] =
+      "CREATE TABLE IF NOT EXISTS tab_state("
+      "restore_key TEXT PRIMARY KEY,"
+      "closed INTEGER NOT NULL,"
+      "window_id INTEGER NOT NULL,"
+      "last_known_url TEXT NOT NULL)";
 
   sql::MetaTable meta;
   // A future/incompatible schema is treated as unusable so the caller resets
   // it.
-  return meta.Init(&db_, kCurrentVersion, kCompatibleVersion) &&
-         meta.GetCompatibleVersionNumber() <= kCurrentVersion &&
-         db_.Execute(kCreateTable);
+  if (!meta.Init(&db_, kCurrentVersion, kCompatibleVersion) ||
+      meta.GetCompatibleVersionNumber() > kCurrentVersion ||
+      !db_.Execute(kCreateVisits) || !db_.Execute(kCreateTabState)) {
+    return false;
+  }
+  // Forward migration: advance an older (v1, visits-only) journal to v2 after
+  // the idempotent `tab_state` creation above, leaving `visits` and its rows
+  // intact.
+  if (meta.GetVersionNumber() < kCurrentVersion &&
+      !meta.SetVersionNumber(kCurrentVersion)) {
+    return false;
+  }
+  return true;
+}
+
+void VisitsStore::UpsertTabState(const TabStateRow& row) {
+  if (!db_.is_open()) {
+    return;
+  }
+  sql::Statement s(db_.GetUniqueStatement(
+      "INSERT OR REPLACE INTO "
+      "tab_state(restore_key,closed,window_id,last_known_url) "
+      "VALUES(?,?,?,?)"));
+  s.BindString(0, row.restore_key);
+  s.BindInt64(1, row.closed ? 1 : 0);
+  s.BindInt64(2, row.window_id);
+  s.BindString(3, row.last_known_url);
+  s.Run();
+}
+
+std::optional<TabStateRow> VisitsStore::GetTabState(
+    const std::string& restore_key) {
+  if (!db_.is_open()) {
+    return std::nullopt;
+  }
+  sql::Statement s(db_.GetUniqueStatement(
+      "SELECT restore_key,closed,window_id,last_known_url FROM tab_state "
+      "WHERE restore_key=?"));
+  s.BindString(0, restore_key);
+  if (!s.Step()) {
+    return std::nullopt;
+  }
+  TabStateRow row;
+  row.restore_key = s.ColumnString(0);
+  row.closed = s.ColumnInt64(1) != 0;
+  row.window_id = s.ColumnInt64(2);
+  row.last_known_url = s.ColumnString(3);
+  return row;
+}
+
+std::vector<TabStateRow> VisitsStore::ReadTabStates() {
+  std::vector<TabStateRow> rows;
+  if (!db_.is_open()) {
+    return rows;
+  }
+  sql::Statement s(db_.GetUniqueStatement(
+      "SELECT restore_key,closed,window_id,last_known_url FROM tab_state "
+      "ORDER BY restore_key ASC"));
+  while (s.Step()) {
+    TabStateRow row;
+    row.restore_key = s.ColumnString(0);
+    row.closed = s.ColumnInt64(1) != 0;
+    row.window_id = s.ColumnInt64(2);
+    row.last_known_url = s.ColumnString(3);
+    rows.push_back(std::move(row));
+  }
+  return rows;
 }
 
 void VisitsStore::Append(const std::string& url, base::Time visited_at) {
