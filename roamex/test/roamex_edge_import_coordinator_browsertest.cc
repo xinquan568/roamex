@@ -290,6 +290,81 @@ IN_PROC_BROWSER_TEST_F(RoamexEdgeImportCoordinatorTest,
             report.Find(EdgeCarrier::kIndexedDb)->status);
 }
 
+// A destination that already holds localStorage data blocks the carrier
+// (queried via the live store, not the always-present leveldb infra) and the
+// existing value is intact.
+IN_PROC_BROWSER_TEST_F(RoamexEdgeImportCoordinatorTest,
+                       DestinationInitializedBlocksLocalStorageNoClobber) {
+  base::ScopedAllowBlockingForTesting allow_blocking;
+  const GURL origin = embedded_test_server()->GetURL("/title1.html");
+  SeedLiveCarriers(origin, "idbval");
+
+  base::ScopedTempDir edge;
+  ASSERT_TRUE(edge.CreateUniqueTempDir());
+  SnapshotEdge(edge.GetPath(), "150.0.0.0");
+
+  // Do NOT clear: the destination keeps localStorage. Set a distinct value so a
+  // wrongful import would be observable.
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), origin));
+  ASSERT_TRUE(content::ExecJs(web(), "localStorage.setItem('auth','destls');"));
+  partition()->GetLocalStorageControl()->Flush();
+
+  EdgeImportReport report =
+      RunCoordinator(edge.GetPath(), {EdgeCarrier::kLocalStorage});
+
+  ASSERT_TRUE(report.Find(EdgeCarrier::kLocalStorage));
+  EXPECT_EQ(CarrierStatus::kBlocked,
+            report.Find(EdgeCarrier::kLocalStorage)->status);
+
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), origin));
+  EXPECT_EQ("destls", content::EvalJs(web(), "localStorage.getItem('auth')"));
+}
+
+// A corrupt source carrier is a reduced import — reported degraded, the other
+// carrier still imports, and the destination stays valid (no corruption).
+IN_PROC_BROWSER_TEST_F(RoamexEdgeImportCoordinatorTest,
+                       CorruptLocalStorageDegradesOtherCarrierSurvives) {
+  base::ScopedAllowBlockingForTesting allow_blocking;
+  const GURL origin = embedded_test_server()->GetURL("/title1.html");
+  SeedLiveCarriers(origin, "idbval");
+
+  base::ScopedTempDir edge;
+  ASSERT_TRUE(edge.CreateUniqueTempDir());
+  SnapshotEdge(edge.GetPath(), "150.0.0.0");
+
+  // Corrupt the source localStorage LevelDB: the dir still exists (so the
+  // carrier is "available"), but open fails (a bogus CURRENT, no MANIFEST) →
+  // the reader soft-fails to empty. IndexedDB remains a valid source.
+  const base::FilePath ls_leveldb =
+      EdgeDefaultDir(edge.GetPath())
+          .Append(FILE_PATH_LITERAL("Local Storage"))
+          .Append(FILE_PATH_LITERAL("leveldb"));
+  ASSERT_TRUE(base::DeletePathRecursively(ls_leveldb));
+  ASSERT_TRUE(base::CreateDirectory(ls_leveldb));
+  ASSERT_TRUE(base::WriteFile(ls_leveldb.AppendASCII("CURRENT"), "garbage\n"));
+
+  ClearOriginStorage(origin);
+
+  EdgeImportReport report = RunCoordinator(
+      edge.GetPath(), {EdgeCarrier::kLocalStorage, EdgeCarrier::kIndexedDb});
+
+  // localStorage: source present but nothing imported → reduced (degraded).
+  ASSERT_TRUE(report.Find(EdgeCarrier::kLocalStorage));
+  EXPECT_EQ(CarrierStatus::kDegraded,
+            report.Find(EdgeCarrier::kLocalStorage)->status);
+  EXPECT_EQ(0u, report.Find(EdgeCarrier::kLocalStorage)->count);
+  EXPECT_TRUE(report.any_degraded());
+  // IndexedDB (valid source) still imports.
+  ASSERT_TRUE(report.Find(EdgeCarrier::kIndexedDb));
+  EXPECT_EQ(CarrierStatus::kImported,
+            report.Find(EdgeCarrier::kIndexedDb)->status);
+
+  // The destination remains valid: the IndexedDB carrier round-trips.
+  ForceInitIdb();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), origin));
+  EXPECT_EQ("idbval", content::EvalJs(web(), kReadIdbJs));
+}
+
 // Feature disabled: every requested carrier reports feature-disabled and
 // nothing runs. Uses its own fixture so the flag stays default-disabled.
 class RoamexEdgeImportCoordinatorDisabledTest

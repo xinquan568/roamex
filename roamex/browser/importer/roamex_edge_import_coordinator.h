@@ -3,6 +3,7 @@
 #define ROAMEX_BROWSER_IMPORTER_ROAMEX_EDGE_IMPORT_COORDINATOR_H_
 
 #include <memory>
+#include <vector>
 
 #include "base/containers/flat_set.h"
 #include "base/files/file_path.h"
@@ -10,6 +11,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
+#include "components/services/storage/public/mojom/storage_usage_info.mojom-forward.h"
 #include "roamex/browser/importer/edge_import_preflight.h"
 #include "roamex/browser/importer/edge_import_report.h"
 #include "roamex/browser/importer/edge_import_types.h"
@@ -77,6 +79,8 @@ class RoamexEdgeImportCoordinator {
                     size_t cookies,
                     bool keychain_available);
   void RunLocalStorageStep();
+  void OnLocalStorageUsageChecked(
+      std::vector<storage::mojom::StorageUsageInfoPtr> usage);
   void OnLocalStorageDone(size_t accepted);
   void RunIndexedDbStep();
   void OnIndexedDbDone(size_t stores);

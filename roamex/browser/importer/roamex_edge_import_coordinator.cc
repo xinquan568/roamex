@@ -9,7 +9,10 @@
 #include "base/task/thread_pool.h"
 #include "chrome/browser/importer/profile_writer.h"
 #include "chrome/browser/profiles/profile.h"
+#include "components/services/storage/public/mojom/local_storage_control.mojom.h"
+#include "components/services/storage/public/mojom/storage_usage_info.mojom.h"
 #include "components/user_data_importer/common/importer_data_types.h"
+#include "content/public/browser/storage_partition.h"
 #include "roamex/browser/importer/roamex_indexed_db_import_stage.h"
 #include "roamex/browser/importer/roamex_origin_storage_import_stage.h"
 #include "roamex/browser/importer/roamex_secret_import_stage.h"
@@ -104,6 +107,14 @@ void RoamexEdgeImportCoordinator::RunSecretStep() {
     return;
   }
 
+  // NOTE (F3 / roam-16 stage design): RoamexSecretImportStage::Run does its
+  // SQLite read + Keychain decrypt synchronously, i.e. blocking work on this UI
+  // thread. roam-16 built the stage that way and roam-20 — which owns the live
+  // secret-import path plus the roam-16 carry-forward — is responsible for
+  // invoking secrets on a fresh profile and, if needed, offloading that work.
+  // roam-19 exercises the secret branch only via availability gating and does
+  // not add a secret destination no-clobber gate (fresh-profile is roam-20's
+  // precondition to uphold for the SQLite carriers).
   secret_stage_ = std::make_unique<RoamexSecretImportStage>(
       preflight_.profile_dir, writer_, keychain_for_testing_);
   secret_stage_->Run(
@@ -137,7 +148,11 @@ void RoamexEdgeImportCoordinator::OnSecretDone(bool attempted_passwords,
               "Edge was running; secrets imported best-effort"};
     }
     if (count == 0) {
-      return {CarrierStatus::kSkipped, "no entries imported"};
+      // Source was present (availability was checked) but nothing imported —
+      // possibly empty, possibly an unreadable/corrupt source. Report it as a
+      // reduced import, never a silent clean skip (F2).
+      return {CarrierStatus::kDegraded,
+              "source present but no entries imported (empty or unreadable)"};
     }
     return {CarrierStatus::kImported, std::string()};
   };
@@ -166,10 +181,24 @@ void RoamexEdgeImportCoordinator::RunLocalStorageStep() {
     RunIndexedDbStep();
     return;
   }
-  // localStorage is a live per-key write (roam-17); it is not whole-carrier
-  // dest-gated (see DestCarrierInitialized). A fresh profile has nothing to
-  // clobber; an existing key is overwritten by design.
+  // Destination no-clobber (F1). localStorage writes live per-key (roam-17), so
+  // a filesystem gate on `Local Storage/leveldb` is unsound (its infra is
+  // present on any used profile). Instead query the LIVE store for actual data:
+  // if the destination already holds ANY localStorage, it is not a fresh import
+  // target — block + report rather than overwrite existing entries.
+  profile_->GetDefaultStoragePartition()->GetLocalStorageControl()->GetUsage(
+      base::BindOnce(&RoamexEdgeImportCoordinator::OnLocalStorageUsageChecked,
+                     weak_factory_.GetWeakPtr()));
+}
 
+void RoamexEdgeImportCoordinator::OnLocalStorageUsageChecked(
+    std::vector<storage::mojom::StorageUsageInfoPtr> usage) {
+  if (!usage.empty()) {
+    report_.Add({EdgeCarrier::kLocalStorage, CarrierStatus::kBlocked, 0,
+                 "destination localStorage already initialized"});
+    RunIndexedDbStep();
+    return;
+  }
   localstorage_stage_ = std::make_unique<RoamexOriginStorageImportStage>(
       preflight_.profile_dir, profile_);
   localstorage_stage_->Import(
@@ -186,8 +215,12 @@ void RoamexEdgeImportCoordinator::OnLocalStorageDone(size_t accepted) {
   } else if (accepted > 0) {
     status = CarrierStatus::kImported;
   } else {
-    status = CarrierStatus::kSkipped;
-    reason = "no localStorage entries imported";
+    // Source present but nothing imported — reduced import, not a silent skip
+    // (F2).
+    status = CarrierStatus::kDegraded;
+    reason =
+        "source present but no localStorage entries imported (empty or "
+        "unreadable)";
   }
   report_.Add(
       {EdgeCarrier::kLocalStorage, status, accepted, std::move(reason)});
@@ -229,9 +262,13 @@ void RoamexEdgeImportCoordinator::RunIndexedDbStep() {
 }
 
 void RoamexEdgeImportCoordinator::OnIndexedDbDone(size_t stores) {
-  report_.Add({EdgeCarrier::kIndexedDb,
-               stores > 0 ? CarrierStatus::kImported : CarrierStatus::kSkipped,
-               stores, stores > 0 ? std::string() : "no first-party stores"});
+  // Source was present (availability was checked); zero stores published means
+  // an empty or unreadable source — a reduced import, not a clean skip (F2).
+  report_.Add(
+      {EdgeCarrier::kIndexedDb,
+       stores > 0 ? CarrierStatus::kImported : CarrierStatus::kDegraded, stores,
+       stores > 0 ? std::string()
+                  : "source present but no first-party stores imported"});
   indexeddb_stage_.reset();
   Finish();
 }
