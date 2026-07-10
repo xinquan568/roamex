@@ -18,6 +18,7 @@ sys.path.insert(0, str(REL))
 import package_roamex  # noqa: E402
 import rename_bundle  # noqa: E402
 import signing_mode  # noqa: E402
+import roamex_signing_config  # noqa: E402
 import signing_plan  # noqa: E402
 
 SECRETS = [
@@ -70,16 +71,50 @@ class SparkleDiscoveryTest(unittest.TestCase):
     def test_discovers_all_nested_code_deepest_first(self):
         parts = signing_plan.discover_sparkle_parts(self.framework)
         names = [p.name for p in parts]
-        self.assertIn("Installer.xpc", names)
-        self.assertIn("Downloader.xpc", names)
-        self.assertIn("Updater.app", names)
-        # Deepest-first: nested bundles/executables precede the framework itself.
+        for n in ("Installer.xpc", "Downloader.xpc", "Updater.app",
+                  "Autoupdate"):
+            self.assertIn(n, names, f"{n} not discovered")
+        # Deepest-first: nested code precedes the framework itself.
         self.assertEqual(parts[-1].name, "Sparkle.framework")
+
+    def test_autoupdate_must_be_planned(self):
+        # A plan missing the loose Autoupdate executable is rejected.
+        plan = [p for p in signing_plan.discover_sparkle_parts(self.framework)
+                if p.name != "Autoupdate"]
+        with self.assertRaises(signing_plan.UnplannedSparkleCodeError):
+            signing_plan.assert_sparkle_fully_planned(self.framework, plan)
+
+    def test_full_discovery_satisfies_the_plan_check(self):
+        parts = signing_plan.discover_sparkle_parts(self.framework)
+        signing_plan.assert_sparkle_fully_planned(self.framework, parts)
 
     def test_missing_nested_code_fails_the_plan_check(self):
         plan = [self.framework]  # framework only, XPC/app omitted
         with self.assertRaises(signing_plan.UnplannedSparkleCodeError):
             signing_plan.assert_sparkle_fully_planned(self.framework, plan)
+
+
+class RoamexSigningConfigTest(unittest.TestCase):
+    def test_config_overrides_product_and_bundle_id(self):
+        class StubBase:
+            pass
+        cls = roamex_signing_config.make_roamex_config_class(StubBase)
+        cfg = cls()
+        self.assertEqual(cfg.product, "Roamex")
+        self.assertEqual(cfg.app_product, "Roamex")
+        self.assertEqual(cfg.base_bundle_id, "com.roamex.Roamex")
+
+    def test_get_parts_injects_sparkle_before_outer_app(self):
+        keys = ["chromium_framework", "chromium_helper", "app"]  # app last
+        ordered = roamex_signing_config.roamex_get_parts({}, keys)
+        self.assertEqual(ordered[-1], "app")
+        sparkle = [k for k in ordered if k.startswith("sparkle:")]
+        self.assertTrue(sparkle, "no Sparkle parts injected")
+        for k in sparkle:
+            self.assertLess(ordered.index(k), ordered.index("app"))
+        # Autoupdate + the framework are represented.
+        self.assertIn("sparkle:Autoupdate", ordered)
+        self.assertIn("sparkle:Sparkle.framework", ordered)
 
 
 class CombinedOrderTest(unittest.TestCase):

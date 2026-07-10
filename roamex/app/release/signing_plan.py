@@ -15,20 +15,23 @@ class UnplannedSparkleCodeError(RuntimeError):
     """Nested Sparkle code exists that the signing plan does not cover."""
 
 
-def discover_sparkle_parts(framework_dir):
-    """Nested code under Sparkle.framework, deepest-first, framework last.
+def _concrete_version(framework_dir):
+    versions = pathlib.Path(framework_dir) / "Versions"
+    for name in ("B", "A"):
+        if (versions / name).is_dir():
+            return versions / name
+    cur = versions / "Current"
+    return cur.resolve() if cur.exists() else versions
 
-    Returns pathlib.Path objects: the XPC services and Updater.app (nested
-    bundles), then the framework directory itself last. codesign signs a
-    bundle's own nested Mach-O via --deep-free recursion, so enumerating the
-    bundle roots deepest-first is sufficient for the ordering invariant.
+
+def discover_sparkle_parts(framework_dir):
+    """Every nested signable under Sparkle.framework, deepest-first, framework
+    last. Includes the XPC services, Updater.app, the standalone Autoupdate
+    executable, and the framework binary itself — the full set codesign must
+    seal (verified against the pinned 2.9.4 layout).
     """
     framework_dir = pathlib.Path(framework_dir)
-    versions = framework_dir / "Versions"
-    current = versions / "B"
-    if not current.is_dir():
-        # Follow Current if B is not the concrete version dir.
-        current = (versions / "Current").resolve()
+    current = _concrete_version(framework_dir)
     nested = []
     xpc_dir = current / "XPCServices"
     if xpc_dir.is_dir():
@@ -36,21 +39,31 @@ def discover_sparkle_parts(framework_dir):
     updater = current / "Updater.app"
     if updater.is_dir():
         nested.append(updater)
-    # Deepest-first: nested bundles, then the framework itself.
+    # Standalone Mach-O executables that are not inside a nested bundle.
+    autoupdate = current / "Autoupdate"
+    if autoupdate.is_file():
+        nested.append(autoupdate)
+    # Deepest-first: nested bundles + loose executables, then the framework.
     return nested + [framework_dir]
 
 
 def _all_nested_code(framework_dir):
+    """Names of every nested signable: .xpc/.app bundles + the loose
+    Autoupdate executable that Sparkle ships in Versions/<v>."""
     framework_dir = pathlib.Path(framework_dir)
     found = set()
     for p in framework_dir.rglob("*"):
         if p.suffix in (".xpc", ".app") and p.is_dir():
             found.add(p.name)
+    current = _concrete_version(framework_dir)
+    autoupdate = current / "Autoupdate"
+    if autoupdate.is_file():
+        found.add(autoupdate.name)
     return found
 
 
 def assert_sparkle_fully_planned(framework_dir, plan):
-    """Fail if any nested .xpc/.app under the framework is absent from `plan`."""
+    """Fail if any nested signable under the framework is absent from `plan`."""
     planned_names = {pathlib.Path(p).name for p in plan}
     for name in _all_nested_code(framework_dir):
         if name not in planned_names:

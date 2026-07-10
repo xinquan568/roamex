@@ -32,10 +32,19 @@ def package_dmg(app_path, out_path, volname="Roamex"):
                         str(pathlib.Path(stage) / app_path.name)], check=True)
         if out_path.exists():
             out_path.unlink()
-        subprocess.run(
-            ["hdiutil", "create", "-volname", volname, "-srcfolder", stage,
-             "-ov", "-format", "UDZO", str(out_path)],
-            check=True, capture_output=True)
+        # hdiutil can transiently fail under concurrent /dev/disk pressure;
+        # a bounded retry keeps the real release job robust.
+        last = None
+        for attempt in range(4):
+            r = subprocess.run(
+                ["hdiutil", "create", "-volname", volname, "-srcfolder",
+                 stage, "-ov", "-format", "UDZO", str(out_path)],
+                capture_output=True, text=True)
+            if r.returncode == 0:
+                break
+            last = r.stderr
+        else:
+            raise RuntimeError(f"hdiutil create failed after retries: {last}")
     return out_path
 
 

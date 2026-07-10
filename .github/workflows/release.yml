@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Roamex release pipeline (roam-33 / §12.6 tier-3). Secrets live ONLY in the
-# protected `release` Environment (gated to protected refs + v* tags). This
-# job builds universal2, resolves the signing mode (all Apple secrets ->
-# signed; none -> deliberate unsigned personal-alpha; partial -> fail-fast),
-# codesigns inside-out (Chromium helpers -> Sparkle framework+XPC same Team ID
-# -> outer app last), notarizes + staples, and packages .dmg/.zip. The appcast
-# / sign_update / draft-then-publish flow is roam-34 (I-6.3).
+# protected `release` Environment (gated to protected refs + v* tags). Builds
+# universal2, resolves the signing mode (all Apple secrets -> signed; none ->
+# deliberate unsigned personal-alpha; partial -> fail-fast), signs inside-out
+# (Chromium helpers -> Sparkle framework+XPC same Team ID -> outer app last),
+# notarizes + staples, and packages .dmg/.zip. Appcast/sign_update/publish is
+# roam-34 (I-6.3). The universal2 build runs only on the provisioned
+# self-hosted release builder; without it the job fails LOUDLY (no silent
+# skip into a broken sign step).
 name: release
 on:
   push:
@@ -16,7 +18,7 @@ permissions:
   contents: read
 jobs:
   build-sign-package:
-    runs-on: macos-14
+    runs-on: [self-hosted, macos, chromium-builder]
     environment: release
     env:
       CHROMIUM_SRC: ${{ github.workspace }}/chromium/src
@@ -42,69 +44,82 @@ jobs:
           ROAMEX_NOTARY_KEY_ID: ${{ secrets.ROAMEX_NOTARY_KEY_ID }}
           ROAMEX_NOTARY_ISSUER_ID: ${{ secrets.ROAMEX_NOTARY_ISSUER_ID }}
           ROAMEX_NOTARY_PRIVATE_KEY: ${{ secrets.ROAMEX_NOTARY_PRIVATE_KEY }}
-        run: echo "mode=$(python3 roamex/app/release/signing_mode.py)" >> "$GITHUB_OUTPUT"
+        run: |
+          # Preserve the gate's non-zero exit (partial secrets -> fail-fast);
+          # a bare $() in an echo would mask it.
+          MODE="$(python3 roamex/app/release/signing_mode.py)"
+          echo "signing mode: ${MODE}"
+          echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
 
-      # The universal2 build (per-arch slices + universalizer.py) runs on the
-      # self-hosted release builder with the warm base cache. Placeholder here
-      # is intentional until the tier-3 builder is provisioned (roam-0.5).
       - name: Build universal2 Roamex.app
         run: |
-          echo "::notice::universal2 build runs on the provisioned release builder"
-          echo "  gn gen out/Release-arm64 --args=\"\$(tr '\n' ' ' < roamex/build/args/release.gn) target_cpu=\\\"arm64\\\"\""
-          echo "  gn gen out/Release-x64   --args=\"\$(tr '\n' ' ' < roamex/build/args/release.gn) target_cpu=\\\"x64\\\"\""
-          echo "  autoninja -C out/Release-arm64 chrome && autoninja -C out/Release-x64 chrome"
-          echo "  python3 \$CHROMIUM_SRC/chrome/installer/mac/universalizer.py ..."
+          set -euo pipefail
+          symlink="${CHROMIUM_SRC}/roamex"
+          ln -sfn "$(pwd)/roamex" "$symlink"
+          python3 "${CHROMIUM_SRC}/roamex/build/apply_patches.py" --chromium-src "${CHROMIUM_SRC}"
+          args="$(tr '\n' ' ' < roamex/build/args/release.gn)"
+          for cpu in arm64 x64; do
+            ( cd "${CHROMIUM_SRC}" && gn gen "out/Release-${cpu}" --args="${args} target_cpu=\"${cpu}\"" )
+            autoninja -C "${CHROMIUM_SRC}/out/Release-${cpu}" chrome
+          done
+          python3 "${CHROMIUM_SRC}/chrome/installer/mac/universalizer.py" \
+            "${CHROMIUM_SRC}/out/Release-arm64/Chromium.app" \
+            "${CHROMIUM_SRC}/out/Release-x64/Chromium.app" \
+            "${CHROMIUM_SRC}/out/Release/Chromium.app"
+          python3 roamex/app/release/rename_bundle.py --app "${CHROMIUM_SRC}/out/Release/Chromium.app"
+          app="${CHROMIUM_SRC}/out/Release/Roamex.app"
+          archs="$(lipo -archs "${app}/Contents/MacOS/Roamex")"
+          echo "universal2 archs: ${archs}"
+          case "${archs}" in
+            *x86_64*arm64*|*arm64*x86_64*) echo "universal2 OK" ;;
+            *) echo "::error::not universal2: ${archs}"; exit 1 ;;
+          esac
+          echo "ROAMEX_APP=${app}" >> "$GITHUB_ENV"
 
-      - name: Rename bundle to Roamex.app
-        run: |
-          echo "::notice::release job renames the built Chromium.app -> Roamex.app"
-          echo "  python3 roamex/app/release/rename_bundle.py --app out/Release/Chromium.app"
-
-      - name: Set up signing keychain (signed mode only)
+      - name: Set up keychain + sign + notarize + staple (signed mode)
         if: steps.mode.outputs.mode == 'signed'
         env:
           ROAMEX_DEVELOPER_ID_CERT_P12: ${{ secrets.ROAMEX_DEVELOPER_ID_CERT_P12 }}
           ROAMEX_DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.ROAMEX_DEVELOPER_ID_CERT_PASSWORD }}
-          ROAMEX_NOTARY_PRIVATE_KEY: ${{ secrets.ROAMEX_NOTARY_PRIVATE_KEY }}
-        run: |
-          eval "$(bash roamex/app/release/keychain_setup.sh)"
-          echo "ROAMEX_SIGN_IDENTITY=${ROAMEX_SIGN_IDENTITY}" >> "$GITHUB_ENV"
-          echo "ROAMEX_NOTARY_KEY_PATH=${ROAMEX_NOTARY_KEY_PATH}" >> "$GITHUB_ENV"
-
-      - name: Sign + notarize + staple (signed mode only)
-        if: steps.mode.outputs.mode == 'signed'
-        env:
           ROAMEX_NOTARY_KEY_ID: ${{ secrets.ROAMEX_NOTARY_KEY_ID }}
           ROAMEX_NOTARY_ISSUER_ID: ${{ secrets.ROAMEX_NOTARY_ISSUER_ID }}
+          ROAMEX_NOTARY_PRIVATE_KEY: ${{ secrets.ROAMEX_NOTARY_PRIVATE_KEY }}
         run: |
+          bash roamex/app/release/keychain_setup.sh
           python3 roamex/app/release/sign_roamex.py \
-            --app out/Release/Roamex.app \
+            --mode signed \
+            --app "${ROAMEX_APP}" \
             --identity "${ROAMEX_SIGN_IDENTITY}" \
             --notary-key "${ROAMEX_NOTARY_KEY_PATH}" \
             --notary-key-id "${ROAMEX_NOTARY_KEY_ID}" \
             --notary-issuer "${ROAMEX_NOTARY_ISSUER_ID}"
 
-      - name: Verify signed artifact (signed mode only)
+      - name: Verify signed artifact (signed mode)
         if: steps.mode.outputs.mode == 'signed'
         run: |
-          codesign --verify --strict --deep --verbose=2 out/Release/Roamex.app
-          xcrun stapler validate out/Release/Roamex.app
-          spctl --assess --type execute --verbose=4 out/Release/Roamex.app
+          codesign --verify --strict --deep --verbose=2 "${ROAMEX_APP}"
+          xcrun stapler validate "${ROAMEX_APP}"
+          spctl --assess --type execute --verbose=4 "${ROAMEX_APP}"
 
       - name: Log unsigned artifact state (unsigned mode)
         if: steps.mode.outputs.mode == 'unsigned'
-        run: echo "::notice::unsigned personal-alpha artifact produced (no Apple secrets); Sparkle EdDSA signature still applies"
+        run: python3 roamex/app/release/sign_roamex.py --mode unsigned --app "${ROAMEX_APP}"
 
       - name: Package .dmg / .zip
         run: |
           python3 roamex/app/release/package_roamex.py \
-            --app out/Release/Roamex.app \
-            --zip out/Release/Roamex.zip --dmg out/Release/Roamex.dmg
+            --app "${ROAMEX_APP}" \
+            --zip "${CHROMIUM_SRC}/out/Release/Roamex.zip" \
+            --dmg "${CHROMIUM_SRC}/out/Release/Roamex.dmg"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: roamex-macos-universal2
           path: |
-            out/Release/Roamex.dmg
-            out/Release/Roamex.zip
+            ${{ env.CHROMIUM_SRC }}/out/Release/Roamex.dmg
+            ${{ env.CHROMIUM_SRC }}/out/Release/Roamex.zip
+
+      - name: Remove signing material
+        if: always()
+        run: bash roamex/app/release/keychain_cleanup.sh
