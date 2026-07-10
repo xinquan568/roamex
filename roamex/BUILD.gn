@@ -12,6 +12,7 @@ group("roamex") {
     "//roamex/browser/profiles",
     "//roamex/browser/signin",
     "//roamex/browser/tab_visit",
+    "//roamex/browser/updates:update_state_machine",
     "//roamex/browser/tabs",
     "//roamex/browser/ui/tabs",
     "//roamex/common",
@@ -76,6 +77,7 @@ test("roamex_unittests") {
     "test/roamex_signin_surfaces_unittest.cc",
     "test/roamex_smoke_unittest.cc",
     "test/roamex_tab_visit_observer_unittest.cc",
+    "test/roamex_update_state_machine_unittest.cc",
     "test/shortcut_registry_unittest.cc",
     "test/tab_strip_placement_observer_unittest.cc",
     "test/tab_strip_placement_unittest.cc",
@@ -101,8 +103,10 @@ test("roamex_unittests") {
     "//roamex/browser/tab_visit",
     "//roamex/browser/tabs",
     "//roamex/browser/ui/tabs",
+    "//roamex/browser/updates:update_state_machine",
     "//roamex/common",
     "//roamex/common:crypto_passkey",
+    "//roamex/mojom",
     "//roamex/utility/importer",
     "//sql",
     "//storage/common",
@@ -123,12 +127,16 @@ test("roamex_unittests") {
 test("roamex_browser_unittests") {
   sources = [
     "test/roamex_browser_prefs_hook_unittest.cc",
+    "test/roamex_update_page_mojo_unittest.cc",
     "test/roamex_settings_private_prefs_unittest.cc",
     "test/settled_visit_journal_service_unittest.cc",
     "test/tab_initial_url_helper_unittest.cc",
     "test/tab_initial_url_persistence_unittest.cc",
   ]
   deps = [
+    "//roamex/browser/updates:test_support",
+    "//roamex/mojom",
+    "//mojo/public/cpp/bindings",
     "//base",
     "//chrome/test:test_support_unit",
     "//components/pref_registry",

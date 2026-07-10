@@ -14,6 +14,12 @@ void InitSparkleUpdater();
 // The "Check for Updates…" menu action.
 void CheckForUpdates();
 
+// roam-85: the update service installs a handler here so the menu action
+// routes to the single process-wide Sparkle owner (one updater, not two).
+// When unset (e.g. the service isn't built), CheckForUpdates() falls back to
+// the standard controller.
+void SetCheckForUpdatesHandler(void (*handler)());
+
 }  // namespace roamex::app
 
 #endif  // ROAMEX_APP_ROAMEX_SPARKLE_UPDATER_H_

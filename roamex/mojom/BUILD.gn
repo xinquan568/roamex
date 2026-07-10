@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Additive //roamex/mojom — the first Roamex mojom surface (roam-85).
+
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("mojom") {
+  sources = [ "update_page.mojom" ]
+}
