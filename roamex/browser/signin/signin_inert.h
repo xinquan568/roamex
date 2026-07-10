@@ -23,11 +23,16 @@ bool ShouldInterceptInertSignin();
 std::u16string GetInertSigninExplanation(BuildState state);
 
 // Observability + dialog control for browser tests (the dialog shim compiled
-// into //chrome/browser/signin:impl calls RecordInertExplanationShown()).
+// into //chrome/browser/signin:impl records via these). "Intercepted" counts
+// every blocked initiation; "shown" only those where the explanation dialog
+// was actually displayed (or would have been, when suppressed for testing).
+void RecordInertSigninIntercepted();
+bool WasInertSigninInterceptedForTesting();
 void RecordInertExplanationShown();
 bool WasInertExplanationShownForTesting();
-void ResetInertExplanationShownForTesting();
+void ResetInertSigninTestState();
 void SuppressInertExplanationDialogForTesting();
+void UnsuppressInertExplanationDialogForTesting();
 bool IsInertExplanationDialogSuppressedForTesting();
 
 }  // namespace roamex::signin

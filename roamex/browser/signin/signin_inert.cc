@@ -7,6 +7,7 @@
 namespace roamex::signin {
 
 namespace {
+bool g_intercepted = false;
 bool g_explanation_shown = false;
 bool g_dialog_suppressed = false;
 }  // namespace
@@ -37,17 +38,27 @@ std::u16string GetInertSigninExplanation(BuildState state) {
   }
 }
 
+void RecordInertSigninIntercepted() {
+  g_intercepted = true;
+}
+bool WasInertSigninInterceptedForTesting() {
+  return g_intercepted;
+}
 void RecordInertExplanationShown() {
   g_explanation_shown = true;
 }
 bool WasInertExplanationShownForTesting() {
   return g_explanation_shown;
 }
-void ResetInertExplanationShownForTesting() {
+void ResetInertSigninTestState() {
+  g_intercepted = false;
   g_explanation_shown = false;
 }
 void SuppressInertExplanationDialogForTesting() {
   g_dialog_suppressed = true;
+}
+void UnsuppressInertExplanationDialogForTesting() {
+  g_dialog_suppressed = false;
 }
 bool IsInertExplanationDialogSuppressedForTesting() {
   return g_dialog_suppressed;

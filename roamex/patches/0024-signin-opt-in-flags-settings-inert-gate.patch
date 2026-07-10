@@ -93,13 +93,12 @@
  #if BUILDFLAG(ENABLE_DICE_SUPPORT)
    DCHECK(!profile->IsOffTheRecord());
  
-@@ -646,6 +683,11 @@
+@@ -646,6 +683,10 @@
  void SignInAndEnableHistorySync(BrowserWindowInterface* browser,
                                  Profile* profile,
                                  signin_metrics::AccessPoint access_point) {
 +  // Roamex (roam-31): see MaybeInterceptInertSignin above.
-+  if (roamex::signin_ui::MaybeInterceptInertSignin(
-+          browser ? browser->GetProfile() : nullptr)) {
++  if (roamex::signin_ui::MaybeInterceptInertSignin(profile)) {
 +    return;
 +  }
  #if !BUILDFLAG(IS_CHROMEOS)
@@ -124,18 +123,29 @@
      ]
      deps += [
        ":signin_promo",
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -649,6 +649,7 @@
+   ]
+ 
+   deps = [
++    "//roamex/common",
+     ":active_use_util",
+     ":browser_features",
+     ":browser_process",
 --- a/chrome/browser/about_flags.cc
 +++ b/chrome/browser/about_flags.cc
-@@ -6,6 +6,8 @@
+@@ -6,6 +6,9 @@
  // https://chromium.googlesource.com/chromium/src/+/main/docs/how_to_add_your_feature_flag.md#step-2_adding-the-feature-flag-to-the-chrome_flags-ui
  
  #include "chrome/browser/about_flags.h"
 +
 +#include "roamex/common/roamex_switches.h"
++#include "roamex/common/roamex_features.h"
  
  #include <iterator>
  #include <map>
-@@ -4740,6 +4742,15 @@
+@@ -4740,6 +4743,15 @@
  //
  // When adding a new choice, add it to the end of the list.
  const FeatureEntry kFeatureEntries[] = {
@@ -151,6 +161,19 @@
  // Include generated flags for flag unexpiry; see //docs/flag_expiry.md and
  // //tools/flags/generate_unexpire_flags.py.
  #include "build/chromeos_buildflags.h"
+@@ -13376,6 +13388,12 @@
+ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
+                                        const FeatureEntry& entry) {
+   version_info::Channel channel = chrome::GetChannel();
++  // Roamex (roam-31): the sign-in opt-in mirror exists only while the E5
++  // epic flag is on — flag-off builds show no Roamex flags row.
++  if (std::string_view("roamex-signin-opt-in") == entry.internal_name &&
++      !base::FeatureList::IsEnabled(roamex::features::kBraveStyleProfiles)) {
++    return true;
++  }
+ #if BUILDFLAG(IS_CHROMEOS)
+   // enable-ui-devtools is only available on for non Stable channels.
+   if (std::string_view(ui_devtools::switches::kEnableUiDevTools) ==
 --- a/chrome/browser/flag-metadata.json
 +++ b/chrome/browser/flag-metadata.json
 @@ -8429,6 +8429,11 @@

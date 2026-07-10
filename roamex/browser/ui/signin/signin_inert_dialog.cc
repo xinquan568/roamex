@@ -4,6 +4,7 @@
 #include <memory>
 #include <utility>
 
+#include "base/functional/callback_helpers.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -18,28 +19,31 @@ bool MaybeInterceptInertSignin(Profile* profile) {
   if (!roamex::signin::ShouldInterceptInertSignin()) {
     return false;
   }
-  roamex::signin::RecordInertExplanationShown();
+  roamex::signin::RecordInertSigninIntercepted();
 
-  if (!roamex::signin::IsInertExplanationDialogSuppressedForTesting()) {
-    Browser* browser = nullptr;
-    if (profile) {
-      browser = chrome::FindBrowserWithProfile(profile);
-    }
-    if (!browser) {
-      BrowserWindowInterface* last_active = chrome::FindLastActive();
-      browser =
-          last_active ? last_active->GetBrowserForMigrationOnly() : nullptr;
-    }
-    if (browser && browser->window()) {
-      ui::DialogModel::Builder builder;
-      builder.SetTitle(u"Google sign-in isn't available in this build")
-          .AddParagraph(
-              ui::DialogModelLabel(roamex::signin::GetInertSigninExplanation(
-                  roamex::signin::GetBuildState())))
-          .AddOkButton(base::DoNothing());
-      constrained_window::ShowBrowserModal(
-          builder.Build(), browser->window()->GetNativeWindow());
-    }
+  if (roamex::signin::IsInertExplanationDialogSuppressedForTesting()) {
+    roamex::signin::RecordInertExplanationShown();
+    return true;
+  }
+
+  // Anchor strictly to the initiating profile — never another profile's
+  // window. Every gated entry point is user-reachable only from a browser
+  // window of that profile; a windowless (programmatic) call is intercepted
+  // without a dialog and is observable via
+  // WasInertSigninInterceptedForTesting.
+  Browser* browser =
+      profile ? chrome::FindBrowserWithProfile(profile) : nullptr;
+  if (browser && browser->window()) {
+    ui::DialogModel::Builder builder;
+    builder.SetInternalName("RoamexSigninInertDialog")
+        .SetTitle(u"Google sign-in isn't available in this build")
+        .AddParagraph(
+            ui::DialogModelLabel(roamex::signin::GetInertSigninExplanation(
+                roamex::signin::GetBuildState())))
+        .AddOkButton(base::DoNothing());
+    constrained_window::ShowBrowserModal(builder.Build(),
+                                         browser->window()->GetNativeWindow());
+    roamex::signin::RecordInertExplanationShown();
   }
   return true;
 }
