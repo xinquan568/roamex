@@ -5,6 +5,7 @@ source_set("common") {
   sources = [
     "roamex_features.cc",
     "roamex_features.h",
+    "roamex_switches.h",
     "roamex_prefs.cc",
     "roamex_prefs.h",
     "tab_strip_placement.cc",

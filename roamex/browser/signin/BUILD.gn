@@ -13,6 +13,8 @@ source_set("signin") {
   sources = [
     "roamex_signin_build_state.cc",
     "roamex_signin_build_state.h",
+    "signin_inert.cc",
+    "signin_inert.h",
     "signin_surfaces.cc",
     "signin_surfaces.h",
   ]

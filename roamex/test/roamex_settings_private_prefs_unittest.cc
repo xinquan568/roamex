@@ -27,6 +27,27 @@ class RoamexSettingsPrivatePrefsTest : public testing::Test {
   extensions::PrefsUtil prefs_util_{&profile_};
 };
 
+// roam-31: the sign-in opt-in pref is allowlisted as BOOLEAN and round-trips.
+TEST_F(RoamexSettingsPrivatePrefsTest, SigninOptInIsAllowlistedAsBoolean) {
+  std::optional<settings_api::PrefObject> pref =
+      prefs_util_.GetPref(roamex::prefs::kSigninOptionalEntryPoint);
+  ASSERT_TRUE(pref.has_value());
+  EXPECT_EQ(settings_api::PrefType::kBoolean, pref->type);
+  EXPECT_EQ(false, pref->value->GetBool());
+}
+
+TEST_F(RoamexSettingsPrivatePrefsTest, SigninOptInRoundTripsThroughSetPref) {
+  base::Value on(true);
+  EXPECT_EQ(extensions::settings_private::SetPrefResult::SUCCESS,
+            prefs_util_.SetPref(roamex::prefs::kSigninOptionalEntryPoint, &on));
+  EXPECT_TRUE(profile_.GetPrefs()->GetBoolean(
+      roamex::prefs::kSigninOptionalEntryPoint));
+  std::optional<settings_api::PrefObject> pref =
+      prefs_util_.GetPref(roamex::prefs::kSigninOptionalEntryPoint);
+  ASSERT_TRUE(pref.has_value());
+  EXPECT_EQ(true, pref->value->GetBool());
+}
+
 TEST_F(RoamexSettingsPrivatePrefsTest, TabStripPositionIsAllowlistedAsNumber) {
   const auto& keys = prefs_util_.GetAllowlistedKeys();
   auto it = keys.find(prefs::kTabStripPosition);

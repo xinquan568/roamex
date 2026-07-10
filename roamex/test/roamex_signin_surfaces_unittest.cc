@@ -4,6 +4,7 @@
 // of the upstream pref (the roamex opt-in is ignored); flag on ⇒ opt-in AND
 // upstream (policy/user false always wins). TDD/P6: written RED first.
 
+#include "base/test/scoped_command_line.h"
 #include "base/test/scoped_feature_list.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/testing_pref_service.h"
@@ -11,6 +12,7 @@
 #include "roamex/browser/signin/signin_surfaces.h"
 #include "roamex/common/roamex_features.h"
 #include "roamex/common/roamex_prefs.h"
+#include "roamex/common/roamex_switches.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace {
@@ -68,6 +70,34 @@ TEST_F(RoamexSigninSurfacesTest, FlagOnOptInOnDefersToUpstream) {
   SetInputs(/*opt_in=*/true, /*upstream=*/true);
   EXPECT_TRUE(IsSigninAllowedOnNextStartup(&prefs_));
   SetInputs(/*opt_in=*/true, /*upstream=*/false);
+  EXPECT_FALSE(IsSigninAllowedOnNextStartup(&prefs_));
+}
+
+// roam-31: the flags-switch mirror. Flag on + pref off + switch ⇒ opted in
+// (defers to upstream); flag off ⇒ the switch is ignored (pure passthrough).
+TEST_F(RoamexSigninSurfacesTest, FlagOnSwitchActsAsOptIn) {
+  base::test::ScopedFeatureList features;
+  features.InitAndEnableFeature(roamex::features::kBraveStyleProfiles);
+  base::test::ScopedCommandLine command_line;
+  command_line.GetProcessCommandLine()->AppendSwitch(
+      roamex::switches::kSigninOptIn);
+
+  SetInputs(/*opt_in=*/false, /*upstream=*/true);
+  EXPECT_TRUE(IsSigninAllowedOnNextStartup(&prefs_));
+  SetInputs(/*opt_in=*/false, /*upstream=*/false);
+  EXPECT_FALSE(IsSigninAllowedOnNextStartup(&prefs_));
+}
+
+TEST_F(RoamexSigninSurfacesTest, FlagOffIgnoresSwitch) {
+  base::test::ScopedFeatureList features;
+  features.InitAndDisableFeature(roamex::features::kBraveStyleProfiles);
+  base::test::ScopedCommandLine command_line;
+  command_line.GetProcessCommandLine()->AppendSwitch(
+      roamex::switches::kSigninOptIn);
+
+  SetInputs(/*opt_in=*/false, /*upstream=*/true);
+  EXPECT_TRUE(IsSigninAllowedOnNextStartup(&prefs_));
+  SetInputs(/*opt_in=*/false, /*upstream=*/false);
   EXPECT_FALSE(IsSigninAllowedOnNextStartup(&prefs_));
 }
 
