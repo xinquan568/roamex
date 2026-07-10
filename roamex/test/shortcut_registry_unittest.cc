@@ -123,11 +123,31 @@ TEST_F(ShortcutRegistryTest, DispatchHonorsOverride) {
 }
 
 TEST_F(ShortcutRegistryTest, ProductionTableShape) {
+  // The tripwire: every production-table change must update this consciously.
+  // Row 0 = roam-12 reload-initial-url; rows 1-2 = roam-25 tab-visit
+  // traversal (Ctrl+Cmd+[ / Ctrl+Cmd+], Carbon keycodes 0x21 / 0x1E).
+  constexpr Chord kCtrlCmdLeftBracket{
+      .cmd = true, .ctrl = true, .keycode = 0x21};
+  constexpr Chord kCtrlCmdRightBracket{
+      .cmd = true, .ctrl = true, .keycode = 0x1E};
+
   auto table = AllShortcuts();
-  ASSERT_EQ(1u, table.size());
+  ASSERT_EQ(3u, table.size());
+
   EXPECT_EQ(34059, table[0].command_id);
+  EXPECT_STREQ("reload_initial_url", table[0].pref_key);
   EXPECT_EQ(&features::kInitialUrl, table[0].feature);
   EXPECT_EQ(kCtrlCmdR, table[0].default_chord);
+
+  EXPECT_EQ(33010, table[1].command_id);
+  EXPECT_STREQ("tab_visit_back", table[1].pref_key);
+  EXPECT_EQ(&features::kTabVisitNav, table[1].feature);
+  EXPECT_EQ(kCtrlCmdLeftBracket, table[1].default_chord);
+
+  EXPECT_EQ(33011, table[2].command_id);
+  EXPECT_STREQ("tab_visit_forward", table[2].pref_key);
+  EXPECT_EQ(&features::kTabVisitNav, table[2].feature);
+  EXPECT_EQ(kCtrlCmdRightBracket, table[2].default_chord);
 }
 
 }  // namespace
