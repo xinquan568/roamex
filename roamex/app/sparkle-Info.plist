@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: Apache-2.0
+     roam-32 (plan §13.6): Sparkle keys merged into the app Info.plist when
+     roamex_enable_sparkle=true. SUPublicEDKey below is a clearly-marked
+     NON-PRODUCTION placeholder — I-6.3 mints the real production keypair in
+     the protected release environment and replaces it. -->
+<plist version="1.0">
+<dict>
+  <key>SUFeedURL</key>
+  <string>https://github.com/xinquan568/roamex/releases/latest/download/appcast.xml</string>
+  <key>SUPublicEDKey</key>
+  <string>PLACEHOLDER-NON-PRODUCTION-KEY-SEE-ROAM-34-I-6.3=</string>
+  <key>SUEnableAutomaticChecks</key>
+  <true/>
+  <key>SUScheduledCheckInterval</key>
+  <integer>86400</integer>
+</dict>
+</plist>

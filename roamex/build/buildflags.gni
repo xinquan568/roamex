@@ -7,4 +7,9 @@ declare_args() {
   # google_keys.gni, see google_keys.gni.template) only when actually authorized. Default: false —
   # the reference build is keyless AND unauthorized.
   roamex_signin_authorized_build = false
+
+  # roam-32 (E6, plan §13.6): bundle Sparkle + compile the updater surface.
+  # Build/release config gating (NOT a base::Feature) — stays false until E6
+  # completes; flag-on builds require roamex/build/fetch_sparkle.py first.
+  roamex_enable_sparkle = false
 }

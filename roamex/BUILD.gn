@@ -2,11 +2,13 @@
 # The //roamex overlay root (roam-1). Additive — the browser target depends on `//roamex` (plan §12.2).
 # Placed at src/roamex/ in the Chromium checkout (BOOTSTRAP.md step 3).
 
+import("//roamex/build/buildflags.gni")
 import("//testing/test.gni")
 
 group("roamex") {
   # Net-new overlay areas are added here as their epics land (E1–E6).
   deps = [
+    "//roamex/app",
     "//roamex/browser/profiles",
     "//roamex/browser/signin",
     "//roamex/browser/tab_visit",
@@ -25,6 +27,31 @@ group("roamex_tests") {
     ":roamex_browsertests",
     ":roamex_unittests",
   ]
+  if (roamex_enable_sparkle) {
+    deps += [ ":roamex_sparkle_tests" ]
+  }
+}
+
+# roam-32: the fixed pre-signed feed driven through Sparkle's own pipeline.
+# Exists only on roamex_enable_sparkle=true builds (vendored framework).
+if (roamex_enable_sparkle) {
+  test("roamex_sparkle_tests") {
+    sources = [ "test/roamex_sparkle_feed_test.mm" ]
+    data = [ "test/data/sparkle/" ]
+    configs += [
+      "//roamex/app:sparkle_link",
+      "//roamex/app:sparkle_test_rpath",
+    ]
+    deps = [
+      "//base",
+      "//base/test:run_all_unittests",
+      "//base/test:test_support",
+      "//net:test_support",
+      "//roamex/app:app_buildflags",
+      "//testing/gtest",
+    ]
+    frameworks = [ "Foundation.framework" ]
+  }
 }
 
 # Fast unit tests — //roamex code + small deps only (no browser layer). Keep this target light.
@@ -32,6 +59,7 @@ test("roamex_unittests") {
   sources = [
     "test/brave_style_profiles_unittest.cc",
     "test/edge_import_adapter_unittest.cc",
+    "test/roamex_appcast_verifier_unittest.cc",
     "test/edge_import_preflight_unittest.cc",
     "test/edge_import_report_unittest.cc",
     "test/edge_indexed_db_reader_unittest.cc",
@@ -56,6 +84,7 @@ test("roamex_unittests") {
     "test/tab_uid_service_unittest.cc",
     "test/visits_store_unittest.cc",
   ]
+  data = [ "test/data/sparkle/" ]
   deps = [
     "//base",
     "//base/test:run_all_unittests",  # provides main() + base::TestSuite (inits
@@ -65,6 +94,7 @@ test("roamex_unittests") {
     "//components/signin/public/base",
     "//components/user_data_importer/common",
     "//crypto",
+    "//roamex/app:appcast_verifier",
     "//roamex/browser/importer",
     "//roamex/browser/profiles",
     "//roamex/browser/signin",
@@ -78,6 +108,7 @@ test("roamex_unittests") {
     "//storage/common",
     "//testing/gtest",
     "//third_party/blink/public/common",
+    "//third_party/boringssl",
     "//third_party/leveldatabase",
     "//ui/gfx:test_support",
     "//ui/menus",

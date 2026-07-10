@@ -46,6 +46,10 @@ target must reference it (GN only loads `//roamex/BUILD.gn` if something depends
 ln -s /abs/path/to/codes/roamex/roamex ~/chromium/src/roamex
 # Apply ALL managed patches (0001 gn_all wiring, 0002 chromium_src redirect, ...) — idempotent, fail-loud:
 python3 ~/chromium/src/roamex/build/apply_patches.py --chromium-src ~/chromium/src
+
+# Roamex (roam-32): vendor the pinned Sparkle.framework (needed by roamex_enable_sparkle=true
+# builds — the flag-on GN targets fail loudly without it; hash-verified, see plan §13.6/R16).
+python3 ~/chromium/src/roamex/build/fetch_sparkle.py
 ```
 (A symlink keeps the git repo as the source of truth; a `gclient` custom-solution/DEPS entry is the
 alternative once the overlay stabilizes. The `patches/` entry becomes a `gclient` runhook later, §12.5.)
