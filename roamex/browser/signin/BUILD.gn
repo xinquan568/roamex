@@ -13,10 +13,15 @@ source_set("signin") {
   sources = [
     "roamex_signin_build_state.cc",
     "roamex_signin_build_state.h",
+    "signin_surfaces.cc",
+    "signin_surfaces.h",
   ]
   public_deps = [ ":signin_buildflags" ]
   deps = [
     "//base",
+    "//components/prefs",
+    "//components/signin/public/base",
     "//google_apis",
+    "//roamex/common",
   ]
 }
