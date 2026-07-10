@@ -5,4 +5,8 @@ import("//mojo/public/tools/bindings/mojom.gni")
 
 mojom("mojom") {
   sources = [ "update_page.mojom" ]
+
+  # roam-37: emit WebUI TypeScript bindings (update_page.mojom-webui.ts) for the
+  # chrome://roamex-about page. Page-local module path.
+  webui_module_path = "/"
 }

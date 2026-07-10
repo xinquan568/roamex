@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+import("//roamex/build/buildflags.gni")
+
+source_set("about") {
+  sources = [
+    "roamex_about_ui.cc",
+    "roamex_about_ui.h",
+  ]
+  deps = [
+    "//base",
+    "//chrome/browser/profiles:profile",
+    "//components/version_info",
+    "//content/public/browser",
+    "//roamex/app:app_buildflags",
+    "//roamex/mojom",
+    "//ui/webui",
+  ]
+  if (roamex_enable_sparkle) {
+    deps += [ "//roamex/browser/updates:update_state_machine" ]
+  }
+  public_deps = [ "//roamex/mojom" ]
+}

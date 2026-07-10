@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# The chrome://roamex-about WebUI (roam-37).
+
+import("//ui/webui/resources/tools/build_webui.gni")
+
+build_webui("resources") {
+  grd_prefix = "roamex_about"
+
+  static_files = [
+    "about.html",
+    "roamex_logo.png",
+  ]
+
+  ts_files = [
+    "app.ts",
+    "app.html.ts",
+    "browser_proxy.ts",
+  ]
+
+  css_files = [ "app.css" ]
+
+  mojo_files_deps =
+      [ "//roamex/mojom:mojom_ts__generator" ]
+  mojo_files =
+      [ "$root_gen_dir/roamex/mojom/update_page.mojom-webui.ts" ]
+
+  ts_deps = [
+    "//third_party/lit/v3_0:build_ts",
+    "//ui/webui/resources/js:build_ts",
+    "//ui/webui/resources/mojo:build_ts",
+  ]
+
+  ts_composite = true
+  webui_context_type = "trusted"
+}
