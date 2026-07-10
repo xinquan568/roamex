@@ -15,7 +15,7 @@ on:
       - "v*"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write  # roam-34: gh release create/edit/upload
 jobs:
   build-sign-package:
     runs-on: [self-hosted, macos, chromium-builder]
@@ -114,6 +114,73 @@ jobs:
             --zip "${CHROMIUM_SRC}/out/Release/Roamex.zip" \
             --dmg "${CHROMIUM_SRC}/out/Release/Roamex.dmg"
 
+      # --- roam-34: the update leg. The Sparkle EdDSA signature is required in
+      # EVERY mode (K3) — gated on the Sparkle key's presence, NOT the Apple
+      # signing mode. A release without the Sparkle key hard-fails.
+      - name: Sign updates + generate appcast (every mode)
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          keyfile="${RUNNER_TEMP}/sparkle_ed_priv"
+          trap 'rm -f "$keyfile"' EXIT   # remove the key on any exit path
+          printf '%s' "${SPARKLE_ED_PRIVATE_KEY:?Sparkle EdDSA key required for every release (K3)}" > "$keyfile"
+          chmod 600 "$keyfile"
+          bin="roamex/third_party/sparkle/bin/sign_update"
+          rel="${CHROMIUM_SRC}/out/Release"
+          # Sign the FINAL artifacts (byte-exact), then build the appcast whose
+          # enclosure url is the per-tag artifact download URL.
+          for art in Roamex.zip Roamex.dmg; do
+            sig="$(python3 roamex/app/appcast/sign_update_wrapper.py               --sign-update-bin "$bin" --artifact "$rel/$art" --key-file "$keyfile")"
+            [ "$art" = "Roamex.zip" ] && ZIP_SIG="$sig"
+          done
+          url="https://github.com/xinquan568/roamex/releases/download/${TAG}/Roamex.zip"
+          python3 roamex/app/appcast/generate_appcast.py             --version "${TAG#v}" --enclosure-url "$url"             --artifact "$rel/Roamex.zip" --ed-signature "$ZIP_SIG"             --pub-date "$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"             --out "$rel/appcast.xml"
+          rm -f "$keyfile"
+
+      - name: Create DRAFT release + staging-validate the DOWNLOADED assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          rel="${CHROMIUM_SRC}/out/Release"
+          bindir="roamex/third_party/sparkle/bin"
+          acct="roamex-release-verify"
+          keyfile="${RUNNER_TEMP}/sparkle_ed_priv_verify"
+          # Import the signing key into a keychain account for Sparkle's own
+          # verifier; remove it (and the temp key) on every exit path.
+          trap 'security delete-generic-password -s "https://sparkle-project.org" -a "$acct" >/dev/null 2>&1 || true; rm -f "$keyfile"' EXIT
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$keyfile"
+          chmod 600 "$keyfile"
+          "$bindir/generate_keys" --account "$acct" -f "$keyfile"
+          # Draft, non-prerelease; assets get per-tag download URLs.
+          gh release create "$TAG" --draft --prerelease=false \
+            --title "Roamex ${TAG}" --notes "Roamex ${TAG}" \
+            "$rel/Roamex.dmg" "$rel/Roamex.zip" "$rel/appcast.xml"
+          # K2: validate the ACTUAL DRAFT ASSETS, not the local files — download
+          # the appcast + artifact from the draft and verify those bytes against
+          # the committed SUPublicEDKey via Sparkle's verifier, before publish.
+          dl="${RUNNER_TEMP}/roamex-staging"
+          mkdir -p "$dl"
+          gh release download "$TAG" --pattern 'appcast.xml' \
+            --pattern 'Roamex.zip' --dir "$dl" --clobber
+          python3 roamex/app/appcast/verify_appcast.py \
+            --appcast "$dl/appcast.xml" --artifact "$dl/Roamex.zip" \
+            --public-key-plist roamex/app/sparkle-Info.plist \
+            --sparkle-bin-dir "$bindir" --account "$acct"
+
+      - name: Publish (only after staging validation)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # --latest so the production /releases/latest/download/appcast.xml
+          # feed (SUFeedURL) resolves to this release (K2, roam-32).
+          gh release edit "$TAG" --draft=false --prerelease=false --latest
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -121,6 +188,7 @@ jobs:
           path: |
             ${{ env.CHROMIUM_SRC }}/out/Release/Roamex.dmg
             ${{ env.CHROMIUM_SRC }}/out/Release/Roamex.zip
+            ${{ env.CHROMIUM_SRC }}/out/Release/appcast.xml
 
       - name: Remove signing material
         if: always()
