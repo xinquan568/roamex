@@ -320,6 +320,40 @@ void TabVisitTraversalCoordinator::AddReopenable(const TabStateRow& row) {
                                  // (reopen-on).
 }
 
+void TabVisitTraversalCoordinator::PrepareForBrowsingDataClear() {
+  // Called SYNCHRONOUSLY at the START of a clear, BEFORE the async store clear
+  // is posted (roam-28 F1). This closes a TOCTOU race: if a gesture were still
+  // active when the store-clear task is queued, a modifier-release / debounce
+  // Settle could run in the clear window and post RecordVisit (Append) AFTER
+  // the Delete on the store sequence — re-appending the just-cleared landed
+  // URL. Cancelling here (no commit: stops the debounce timer, drops controller
+  // state, clears traversal_active_ + reopened_url_by_uid_) makes any such
+  // Settle a no-op.
+  CancelGesture();
+  // Also drop the in-memory closed-tab records NOW — they carry last_known_url,
+  // so a cleared closed tab must not remain reopenable from memory (roam-28
+  // F2), and a new gesture starting in the clear window must not reopen one.
+  // This touches ONLY closed-tab state: live-tab uids are not in reopenable_,
+  // and the service's volatile live sets are untouched (live identity survives,
+  // §6.9).
+  reopenable_.clear();
+  reopened_url_by_uid_.clear();
+  // Invalidate any in-flight sidecar load: a GetAllTabStates read posted BEFORE
+  // this clear reflects the pre-clear sidecar, so its reply must not resurrect
+  // cleared closed-tab rows (roam-28 N1).
+  ++reopenable_generation_;
+}
+
+void TabVisitTraversalCoordinator::OnBrowsingDataCleared() {
+  // Called AFTER the async store clear (visits deleted + orphaned closed
+  // tab_state GC'd) completes. The gesture + in-memory URL caches were already
+  // dropped synchronously in PrepareForBrowsingDataClear; here we only resync
+  // the reopenable cache to the now-GC'd sidecar (best-effort, async) so any
+  // closed rows that survived a time-ranged GC become reopenable again.
+  LoadReopenableFromSidecar();
+  OnReachabilityMaybeChanged();
+}
+
 BrowserWindowInterface* TabVisitTraversalCoordinator::ReopenTargetWindow(
     const TabStateRow& row) const {
   // Prefer the tab's ORIGINAL window if it is still live (so an eviction-
@@ -379,14 +413,23 @@ void TabVisitTraversalCoordinator::RebindSidecar(const TabStateRow& row) {
 void TabVisitTraversalCoordinator::LoadReopenableFromSidecar() {
   if (SettledVisitJournalService* journal =
           SettledVisitJournalFactory::GetForProfile(profile_)) {
+    // Stamp the read with the current generation so a reply that predates a
+    // browsing-data clear (which bumps the generation) is dropped as stale
+    // (roam-28 N1) — otherwise it could resurrect just-cleared closed-tab URLs.
     journal->GetAllTabStates(
         base::BindOnce(&TabVisitTraversalCoordinator::OnReopenableLoaded,
-                       weak_factory_.GetWeakPtr()));
+                       weak_factory_.GetWeakPtr(), reopenable_generation_));
   }
 }
 
 void TabVisitTraversalCoordinator::OnReopenableLoaded(
+    int generation,
     std::vector<TabStateRow> rows) {
+  if (generation != reopenable_generation_) {
+    // A browsing-data clear happened after this read was posted — the rows
+    // reflect the PRE-clear sidecar and must not repopulate reopenable_.
+    return;
+  }
   for (TabStateRow& row : rows) {
     if (!row.closed || row.restore_key.empty() ||
         recently_reopened_.contains(row.restore_key)) {

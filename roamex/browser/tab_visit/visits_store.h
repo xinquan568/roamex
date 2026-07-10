@@ -76,6 +76,15 @@ class VisitsStore {
   // The number of retained visits.
   size_t RowCount();
 
+  // roam-28 (I-4.8): Clear-Browsing-Data. In one transaction, deletes settled
+  // visits whose `visited_at` is in [begin, end) (begin-inclusive,
+  // end-exclusive — matching Chromium history; a null `begin` / max `end` is an
+  // unbounded side, so null-begin + max-end truncates all), then GCs orphaned
+  // CLOSED `tab_state` rows (closed=1 whose uid no longer has any surviving
+  // visit). LIVE rows (closed=0) are never touched. No-op if the store is not
+  // open.
+  void ClearForBrowsingDataRemoval(base::Time begin, base::Time end);
+
   // Inserts-or-replaces the persisted state for `row.restore_key` (mutable, not
   // append-only). No-op if the store is not open.
   void UpsertTabState(const TabStateRow& row);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "roamex/browser/tab_visit/visits_store.h"
 
+#include <limits>
 #include <utility>
 
 #include "base/files/file_util.h"
@@ -218,6 +219,47 @@ size_t VisitsStore::RowCount() {
     return static_cast<size_t>(s.ColumnInt64(0));
   }
   return 0;
+}
+
+void VisitsStore::ClearForBrowsingDataRemoval(base::Time begin,
+                                              base::Time end) {
+  if (!db_.is_open()) {
+    return;
+  }
+  sql::Transaction transaction(&db_);
+  if (!transaction.Begin()) {
+    return;
+  }
+
+  // (1) Delete settled visits in the [begin, end) range — begin-INCLUSIVE,
+  // end-EXCLUSIVE, matching Chromium history semantics. Open bounds arrive as a
+  // null begin (all-time lower) and/or a max end (all-time upper); represent
+  // them with the int64 extremes rather than serializing base::Time::Max()
+  // through ToStorage (which would overflow). All real visited_at values sit
+  // far inside (INT64_MIN, INT64_MAX), so a null-begin + max-end truncates
+  // every row and an exact-`end` row is never deleted.
+  sql::Statement del(db_.GetUniqueStatement(
+      "DELETE FROM visits WHERE visited_at >= ? AND visited_at < ?"));
+  del.BindInt64(0, begin.is_null() ? std::numeric_limits<int64_t>::min()
+                                   : ToStorage(begin));
+  del.BindInt64(
+      1, end.is_max() ? std::numeric_limits<int64_t>::max() : ToStorage(end));
+  if (!del.Run()) {
+    return;
+  }
+
+  // (2) GC orphaned CLOSED tab_state rows: a closed row (closed=1) whose
+  // durable uid no longer appears in any SURVIVING visit. Live rows (closed=0)
+  // are NEVER touched (live-tab liveness must survive a clear, §6.9). Legacy
+  // empty-uid visits are excluded from the reference set.
+  sql::Statement gc(db_.GetUniqueStatement(
+      "DELETE FROM tab_state WHERE closed=1 AND restore_key NOT IN "
+      "(SELECT DISTINCT tab_uid FROM visits WHERE tab_uid<>'')"));
+  if (!gc.Run()) {
+    return;
+  }
+
+  transaction.Commit();
 }
 
 }  // namespace roamex::tab_visit

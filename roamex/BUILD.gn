@@ -109,6 +109,7 @@ test("roamex_browser_unittests") {
 test("roamex_browsertests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
+    "test/roamex_clear_browsing_data_browsertest.cc",
     "test/roamex_edge_import_coordinator_browsertest.cc",
     "test/roamex_edge_import_driver_browsertest.cc",
     "test/roamex_frame_rtl_fullscreen_browsertest.cc",

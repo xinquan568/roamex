@@ -5,6 +5,11 @@
 # via patch 0015's `sources +=` (the two-piece pattern from roam-10 / patch 0009).
 source_set("tab_visit") {
   sources = [
+    # roam-28 (I-4.8): the cross-layer Clear-Browsing-Data hook registry. Low
+    # (BrowserContext is forward-declared / pass-through only, no //content dep);
+    # the ui layer registers the impl and the browsing_data delegate invokes it.
+    "settled_visit_clear_hook.cc",
+    "settled_visit_clear_hook.h",
     "settled_visit_journal_service.cc",
     "settled_visit_journal_service.h",
 

@@ -56,6 +56,20 @@ void SettledVisitJournalService::GetVisits(
   store_.AsyncCall(&VisitsStore::ReadAll).Then(std::move(callback));
 }
 
+void SettledVisitJournalService::ClearBrowsingData(base::Time begin,
+                                                   base::Time end,
+                                                   base::OnceClosure done) {
+  if (store_.is_null()) {
+    // Feature disabled (unbound store) — still run the completion token exactly
+    // once so BrowsingDataRemover's "done" fires.
+    std::move(done).Run();
+    return;
+  }
+  store_.AsyncCall(&VisitsStore::ClearForBrowsingDataRemoval)
+      .WithArgs(begin, end)
+      .Then(std::move(done));
+}
+
 void SettledVisitJournalService::GetAllTabStates(
     base::OnceCallback<void(std::vector<TabStateRow>)> callback) {
   if (store_.is_null()) {

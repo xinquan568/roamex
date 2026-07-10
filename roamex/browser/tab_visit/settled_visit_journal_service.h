@@ -46,6 +46,16 @@ class SettledVisitJournalService : public KeyedService {
   // caller's sequence. Returns an empty vector when the feature is disabled.
   void GetVisits(base::OnceCallback<void(std::vector<VisitRow>)> callback);
 
+  // roam-28 (I-4.8): Clear-Browsing-Data. Clears persisted settled visits in
+  // [begin, end) and GCs orphaned closed tab_state (never live rows), then runs
+  // `done` on the caller's sequence. Runs `done` immediately when the feature
+  // is disabled (unbound store), so the BrowsingDataRemover completion token
+  // always fires exactly once. See the pure store method for the range
+  // semantics.
+  void ClearBrowsingData(base::Time begin,
+                         base::Time end,
+                         base::OnceClosure done);
+
   // Reads all persisted tab-state rows and runs `callback` on the caller's
   // sequence (for the startup reload). Empty when disabled / in-memory-empty.
   void GetAllTabStates(

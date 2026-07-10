@@ -110,6 +110,27 @@ class TabVisitTraversalCoordinator : public KeyedService {
   // after a close sees the uid as reopenable. Clears any stale tombstone.
   void AddReopenable(const TabStateRow& row);
 
+  // roam-28 (I-4.8): the user is clearing browsing data. Two-phase so an
+  // in-flight gesture cannot re-append a just-cleared URL during the async
+  // store-clear window (F1):
+  //  - PrepareForBrowsingDataClear() is invoked SYNCHRONOUSLY by the ui-layer
+  //    clear hook BEFORE the async store clear is posted. It cancels any
+  //    in-flight gesture (no commit) and drops the in-memory closed-tab records
+  //    (reopenable_ carries last_known_url — F2) so a Settle or a new gesture
+  //    in the clear window cannot append or reopen a cleared URL.
+  //  - OnBrowsingDataCleared() is invoked AFTER the store clear completes; it
+  //    only resyncs the reopenable cache to the now-GC'd sidecar.
+  // Neither touches live-tab uids (reopenable_ holds only CLOSED tabs) nor any
+  // volatile live set (live identity survives, §6.9).
+  void PrepareForBrowsingDataClear();
+  void OnBrowsingDataCleared();
+
+  // For the ui-layer clear hook to weak-guard this per-profile service across
+  // the async store-clear reply (roam-28).
+  base::WeakPtr<TabVisitTraversalCoordinator> AsWeakPtr() {
+    return weak_factory_.GetWeakPtr();
+  }
+
   // Command enablement (§6.3): during a gesture, delegate to the controller;
   // before a gesture, a Back is enabled iff the commit-log has a reachable uid
   // older than the tail, and a Forward is disabled.
@@ -161,7 +182,10 @@ class TabVisitTraversalCoordinator : public KeyedService {
   // refresh), skipping uids that were reopened this session (the tombstone
   // set).
   void LoadReopenableFromSidecar();
-  void OnReopenableLoaded(std::vector<TabStateRow> rows);
+  // `generation` is the reopenable_generation_ captured when the read was
+  // posted; a mismatch means a clear happened since, so the (pre-clear) rows
+  // are dropped (roam-28 N1).
+  void OnReopenableLoaded(int generation, std::vector<TabStateRow> rows);
   // The target window to reopen into (the row's window if live, else the first
   // normal window of the profile).
   BrowserWindowInterface* ReopenTargetWindow(const TabStateRow& row) const;
@@ -182,6 +206,10 @@ class TabVisitTraversalCoordinator : public KeyedService {
   // them) + the injected reopen action (lives in a //chrome/browser/ui shim).
   base::flat_map<std::string, TabStateRow> reopenable_;
   base::flat_set<std::string> recently_reopened_;
+  // roam-28 (N1): bumped by PrepareForBrowsingDataClear; an async sidecar-load
+  // reply whose captured generation no longer matches is dropped, so a read
+  // posted before a clear cannot resurrect just-cleared closed-tab rows.
+  int reopenable_generation_ = 0;
   // uid -> intended URL for tabs reopened during the CURRENT gesture. A
   // fallback-reopened tab's navigation is not committed by Settle time, so the
   // settled visit is recorded from this authoritative last_known_url instead of

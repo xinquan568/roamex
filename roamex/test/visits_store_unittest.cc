@@ -268,5 +268,105 @@ TEST_F(VisitsStoreTest, PartialV3MigrationDoesNotRaze) {
   EXPECT_EQ(3, meta.GetVersionNumber());
 }
 
+// roam-28 (I-4.8): all-time clear (null begin + max end) truncates every visit.
+TEST_F(VisitsStoreTest, ClearAllTimeTruncatesVisits) {
+  VisitsStore store;
+  ASSERT_TRUE(store.OpenInMemory());
+  const base::Time t = base::Time::Now();
+  store.Append("a", "https://a.test/", t - base::Days(2));
+  store.Append("b", "https://b.test/", t);
+  ASSERT_EQ(2u, store.RowCount());
+
+  store.ClearForBrowsingDataRemoval(base::Time(), base::Time::Max());
+  EXPECT_EQ(0u, store.RowCount());
+}
+
+// Time-ranged clear is begin-INCLUSIVE, end-EXCLUSIVE: a row at exactly `end`
+// SURVIVES; a row at exactly `begin` is removed.
+TEST_F(VisitsStoreTest, ClearRangeIsBeginInclusiveEndExclusive) {
+  VisitsStore store;
+  ASSERT_TRUE(store.OpenInMemory());
+  const base::Time base = base::Time::Now();
+  const base::Time begin = base;
+  const base::Time end = base + base::Hours(2);
+  store.Append("before", "https://before.test/", begin - base::Minutes(1));
+  store.Append("at_begin", "https://at-begin.test/", begin);  // removed (>=)
+  store.Append("mid", "https://mid.test/", begin + base::Hours(1));  // removed
+  store.Append("at_end", "https://at-end.test/", end);  // SURVIVES (<)
+  store.Append("after", "https://after.test/", end + base::Minutes(1));
+
+  store.ClearForBrowsingDataRemoval(begin, end);
+
+  std::vector<VisitRow> rows = store.ReadAll();
+  ASSERT_EQ(3u, rows.size());
+  EXPECT_EQ("before", rows[0].tab_uid);
+  EXPECT_EQ("at_end", rows[1].tab_uid);  // exactly `end` was kept.
+  EXPECT_EQ("after", rows[2].tab_uid);
+}
+
+// One-sided bound: null begin + finite end removes everything strictly before
+// end (no lower bound).
+TEST_F(VisitsStoreTest, ClearOpenBeginFiniteEnd) {
+  VisitsStore store;
+  ASSERT_TRUE(store.OpenInMemory());
+  const base::Time base = base::Time::Now();
+  store.Append("old", "https://old.test/", base - base::Days(30));
+  store.Append("recent", "https://recent.test/", base + base::Days(1));
+
+  store.ClearForBrowsingDataRemoval(base::Time(), base);  // (-inf, base)
+  std::vector<VisitRow> rows = store.ReadAll();
+  ASSERT_EQ(1u, rows.size());
+  EXPECT_EQ("recent", rows[0].tab_uid);  // only the one >= base survived.
+}
+
+// One-sided bound: finite begin + max end removes everything at/after begin (no
+// upper bound) WITHOUT serializing base::Time::Max().
+TEST_F(VisitsStoreTest, ClearFiniteBeginOpenEnd) {
+  VisitsStore store;
+  ASSERT_TRUE(store.OpenInMemory());
+  const base::Time base = base::Time::Now();
+  store.Append("old", "https://old.test/", base - base::Days(1));
+  store.Append("at", "https://at.test/", base);
+  store.Append("new", "https://new.test/", base + base::Days(1));
+
+  store.ClearForBrowsingDataRemoval(base, base::Time::Max());  // [base, +inf)
+  std::vector<VisitRow> rows = store.ReadAll();
+  ASSERT_EQ(1u, rows.size());
+  EXPECT_EQ("old", rows[0].tab_uid);  // only the one < base survived.
+}
+
+// GC removes ONLY closed tab_state rows whose uid has no surviving visit; live
+// rows and closed rows with a surviving visit are kept.
+TEST_F(VisitsStoreTest, ClearGCsOnlyOrphanedClosedTabStates) {
+  VisitsStore store;
+  ASSERT_TRUE(store.OpenInMemory());
+  const base::Time base = base::Time::Now();
+  // A closed tab whose only visit is in-range (will be orphaned by the clear).
+  store.Append("orphan", "https://orphan.test/", base);
+  store.UpsertTabState({"orphan", /*closed=*/true, 1, "https://orphan.test/"});
+  // A closed tab whose visit is OUT of range (survives -> not orphaned).
+  store.Append("kept-closed", "https://kept.test/", base - base::Days(10));
+  store.UpsertTabState(
+      {"kept-closed", /*closed=*/true, 2, "https://kept.test/"});
+  // A LIVE tab (closed=0) — must NEVER be GC'd, even with no visit.
+  store.UpsertTabState({"live", /*closed=*/false, 3, "https://live.test/"});
+  ASSERT_EQ(3u, store.ReadTabStates().size());
+
+  // Clear [base, +inf): removes the "orphan" visit, keeps "kept-closed".
+  store.ClearForBrowsingDataRemoval(base, base::Time::Max());
+
+  std::vector<TabStateRow> states = store.ReadTabStates();
+  ASSERT_EQ(2u, states.size());
+  bool has_live = false, has_kept = false, has_orphan = false;
+  for (const TabStateRow& r : states) {
+    has_live |= r.restore_key == "live";
+    has_kept |= r.restore_key == "kept-closed";
+    has_orphan |= r.restore_key == "orphan";
+  }
+  EXPECT_TRUE(has_live);     // live row never touched (§6.9).
+  EXPECT_TRUE(has_kept);     // closed row with a surviving visit kept.
+  EXPECT_FALSE(has_orphan);  // closed + orphaned row GC'd.
+}
+
 }  // namespace
 }  // namespace roamex::tab_visit
