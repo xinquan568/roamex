@@ -24,6 +24,7 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
+#include "components/signin/public/base/signin_buildflags.h"
 #include "components/signin/public/base/signin_pref_names.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -79,6 +80,11 @@ class RoamexSigninSurfaceSweepFlagOffTest : public InProcessBrowserTest {
  private:
   base::test::ScopedFeatureList features_;
 };
+
+// The DICE-dependent contracts (the production hook lives inside ACMM's
+// ENABLE_DICE_SUPPORT branch); on Mirror/non-DICE builds these flows cannot
+// occur, so the tests compile out with the same guard.
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
 
 // The R13 sweep — one concrete observable per §7.3 inventory item, on a clean
 // unmanaged profile with the opt-in pref at its default (off).
@@ -172,7 +178,8 @@ IN_PROC_BROWSER_TEST_F(RoamexSigninSurfaceSweepTest, OptInReexposesOnRestart) {
       signin::AccountConsistencyMethod::kDisabled);
 }
 
-// Flag-off: upstream-identical on a clean unmanaged profile.
+// Flag-off: upstream-identical on a clean unmanaged profile, and the roamex
+// opt-in pref has no influence anywhere (promo family pass-through).
 IN_PROC_BROWSER_TEST_F(RoamexSigninSurfaceSweepFlagOffTest,
                        UpstreamBehaviorUntouched) {
   Profile* profile = browser()->profile();
@@ -183,7 +190,22 @@ IN_PROC_BROWSER_TEST_F(RoamexSigninSurfaceSweepFlagOffTest,
                              "user@example.com",
                              /*allow_account_from_other_profile=*/true)
                   .IsOk());
+
+  // Promo pass-through: toggling the roamex opt-in under the disabled flag
+  // must not move any promo gate.
+  const bool bookmark_promo_before =
+      signin::ShouldShowBookmarkSignInPromo(*profile);
+  const bool password_promo_before =
+      signin::ShouldShowPasswordSignInPromo(*profile);
+  profile->GetPrefs()->SetBoolean(roamex::prefs::kSigninOptionalEntryPoint,
+                                  true);
+  EXPECT_EQ(signin::ShouldShowBookmarkSignInPromo(*profile),
+            bookmark_promo_before);
+  EXPECT_EQ(signin::ShouldShowPasswordSignInPromo(*profile),
+            password_promo_before);
 }
+
+#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
 }  // namespace
 }  // namespace roamex
