@@ -134,61 +134,96 @@ suite('RoamexAbout', function() {
     assertEquals(1, fake.checkCount);
   });
 
-  test('checking shows a spinner and pill text', async function() {
-    fake.push({status: UpdateStatus.kChecking});
-    await element.updateComplete;
-    assertTrue(!!q('spinner'));
-    assertEquals('Checking for updates…', q('statusPill')!.textContent!.trim());
-    assertFalse(!!q('updateCard'));
-  });
-
-  test('up to date shows pill and no card', async function() {
-    fake.push({status: UpdateStatus.kUpToDate});
-    await element.updateComplete;
-    assertEquals('Roamex is up to date', q('statusPill')!.textContent!.trim());
-    assertFalse(!!q('updateCard'));
-    assertFalse(!!q('spinner'));
-  });
-
-  test('available renders version, date and notes', async function() {
-    fake.push({
+  // Table-driven status matrix: for every UpdateStatus, assert the exact pill
+  // text and the FULL set of present/absent controls (F4).
+  interface Row {
+    status: UpdateStatus;
+    version?: string;
+    date?: string;
+    notes?: string;
+    error?: string;
+    pill: string;
+    present: string[];
+    absent: string[];
+  }
+  const MATRIX: Row[] = [
+    {
+      status: UpdateStatus.kChecking,
+      pill: 'Checking for updates…',
+      present: ['spinner', 'statusPill', 'checkNow'],
+      absent: ['updateCard', 'download', 'skip', 'restart', 'progress',
+               'errorText'],
+    },
+    {
+      status: UpdateStatus.kUpToDate,
+      pill: 'Roamex is up to date',
+      present: ['statusPill', 'checkNow'],
+      absent: ['spinner', 'updateCard', 'download', 'skip', 'restart',
+               'progress', 'errorText'],
+    },
+    {
       status: UpdateStatus.kAvailable,
       version: '2.0.0',
       date: '2026-07-01',
       notes: 'Shiny new build',
+      pill: 'Update available',
+      present: ['statusPill', 'updateCard', 'download', 'skip'],
+      absent: ['spinner', 'restart', 'progress', 'errorText'],
+    },
+    {
+      status: UpdateStatus.kDownloading,
+      pill: 'Downloading…',
+      present: ['statusPill', 'updateCard', 'progress'],
+      absent: ['spinner', 'download', 'skip', 'restart', 'errorText'],
+    },
+    {
+      status: UpdateStatus.kReadyToInstall,
+      pill: 'Ready to install',
+      present: ['statusPill', 'updateCard', 'restart'],
+      absent: ['spinner', 'download', 'skip', 'progress', 'errorText'],
+    },
+    {
+      status: UpdateStatus.kError,
+      error: 'network down',
+      pill: 'network down',
+      present: ['statusPill', 'errorText'],
+      absent: ['spinner', 'updateCard', 'download', 'skip', 'restart',
+               'progress'],
+    },
+  ];
+
+  for (const row of MATRIX) {
+    test(`status ${row.status}: pill text + controls`, async function() {
+      fake.push({
+        status: row.status,
+        version: row.version ?? '',
+        date: row.date ?? '',
+        notes: row.notes ?? '',
+        error: row.error ?? '',
+        progress: row.status === UpdateStatus.kDownloading ? 0.5 : 0,
+      });
+      await element.updateComplete;
+
+      assertEquals(row.pill, q('statusPill')!.textContent!.trim());
+      for (const id of row.present) {
+        assertTrue(!!q(id), `expected #${id} present for status ${row.status}`);
+      }
+      for (const id of row.absent) {
+        assertFalse(!!q(id), `expected #${id} absent for status ${row.status}`);
+      }
+
+      if (row.version) {
+        assertTrue(q('updateCard')!.textContent!.includes(row.version));
+      }
+      if (row.date) {
+        assertTrue(q('updateCard')!.textContent!.includes(row.date));
+      }
+      if (row.notes) {
+        assertTrue(q('updateCard')!.textContent!.includes(row.notes));
+      }
+      if (row.error) {
+        assertEquals(row.error, q('errorText')!.textContent!.trim());
+      }
     });
-    await element.updateComplete;
-    assertTrue(q('updateCard')!.textContent!.includes('2.0.0'));
-    assertTrue(q('updateCard')!.textContent!.includes('2026-07-01'));
-    assertTrue(q('updateCard')!.textContent!.includes('Shiny new build'));
-    // Available: download + skip present; restart + progress absent.
-    assertTrue(!!q('download'));
-    assertTrue(!!q('skip'));
-    assertFalse(!!q('restart'));
-    assertFalse(!!q('progress'));
-  });
-
-  test('downloading shows progress, not download buttons', async function() {
-    fake.push({status: UpdateStatus.kDownloading, progress: 0.5});
-    await element.updateComplete;
-    assertTrue(!!q('progress'));
-    assertFalse(!!q('download'));
-    assertFalse(!!q('restart'));
-  });
-
-  test('ready shows only restart', async function() {
-    fake.push({status: UpdateStatus.kReadyToInstall});
-    await element.updateComplete;
-    assertTrue(!!q('restart'));
-    assertFalse(!!q('download'));
-    assertFalse(!!q('progress'));
-  });
-
-  test('error renders error text and no card', async function() {
-    fake.push({status: UpdateStatus.kError, error: 'network down'});
-    await element.updateComplete;
-    assertTrue(!!q('errorText'));
-    assertEquals('network down', q('errorText')!.textContent!.trim());
-    assertFalse(!!q('updateCard'));
-  });
+  }
 });
