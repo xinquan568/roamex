@@ -1,0 +1,38 @@
+diff --git a/chrome/browser/ui/webui/signin/BUILD.gn b/chrome/browser/ui/webui/signin/BUILD.gn
+index 2afdd5dedc..5ec1dc2e72 100644
+--- a/chrome/browser/ui/webui/signin/BUILD.gn
++++ b/chrome/browser/ui/webui/signin/BUILD.gn
+@@ -434,6 +434,7 @@ if (!is_chromeos) {
+       "//components/supervised_user/core/common:features",
+       "//content/public/browser",
+       "//google_apis",
++      "//roamex/browser/profiles",
+       "//services/network/public/mojom:url_loader_base",
+       "//skia",
+       "//ui/base",
+diff --git a/chrome/browser/ui/webui/signin/profile_picker_ui.cc b/chrome/browser/ui/webui/signin/profile_picker_ui.cc
+index 2ffc595736..88f466a3e9 100644
+--- a/chrome/browser/ui/webui/signin/profile_picker_ui.cc
++++ b/chrome/browser/ui/webui/signin/profile_picker_ui.cc
+@@ -41,6 +41,7 @@
+ #include "components/regional_capabilities/regional_capabilities_service.h"
+ #include "components/signin/public/base/signin_buildflags.h"
+ #include "components/signin/public/base/signin_switches.h"
++#include "roamex/browser/profiles/brave_style_profiles.h"
+ #include "components/strings/grit/components_strings.h"
+ #include "components/sync/base/features.h"
+ #include "content/public/browser/web_contents.h"
+@@ -294,8 +295,12 @@ void AddFlags(content::WebUIDataSource* html_source,
+   html_source->AddBoolean(
+       "profilesReorderingEnabled",
+       base::FeatureList::IsEnabled(switches::kProfilesReordering));
++  // Roamex (roam-29): name-only profile creation — with kBraveStyleProfiles
++  // on, the sign-in creation step is suppressed and the picker goes straight
++  // to the local (name + avatar/theme) path.
+   html_source->AddBoolean("signInProfileCreationFlowSupported",
+-                          AccountConsistencyModeManager::IsDiceSignInAllowed());
++                          roamex::profiles::AllowSigninProfileCreationStep(
++                              AccountConsistencyModeManager::IsDiceSignInAllowed()));
+ 
+   html_source->AddBoolean("isBrowserSigninAllowed", IsBrowserSigninAllowed());
+   html_source->AddBoolean("isForceSigninEnabled",

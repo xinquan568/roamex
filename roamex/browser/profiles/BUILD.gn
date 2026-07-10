@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Additive //roamex/browser/profiles — Brave-style name-only profile creation (E5, roam-29).
+
+source_set("profiles") {
+  sources = [
+    "brave_style_profiles.cc",
+    "brave_style_profiles.h",
+  ]
+  deps = [
+    "//base",
+    "//roamex/common",
+  ]
+}

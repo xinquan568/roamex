@@ -7,6 +7,7 @@ import("//testing/test.gni")
 group("roamex") {
   # Net-new overlay areas are added here as their epics land (E1–E6).
   deps = [
+    "//roamex/browser/profiles",
     "//roamex/browser/signin",
     "//roamex/browser/tab_visit",
     "//roamex/browser/tabs",
@@ -29,6 +30,7 @@ group("roamex_tests") {
 # Fast unit tests — //roamex code + small deps only (no browser layer). Keep this target light.
 test("roamex_unittests") {
   sources = [
+    "test/brave_style_profiles_unittest.cc",
     "test/edge_import_adapter_unittest.cc",
     "test/edge_import_preflight_unittest.cc",
     "test/edge_import_report_unittest.cc",
@@ -61,6 +63,7 @@ test("roamex_unittests") {
     "//components/user_data_importer/common",
     "//crypto",
     "//roamex/browser/importer",
+    "//roamex/browser/profiles",
     "//roamex/browser/signin",
     "//roamex/browser/tab_visit",
     "//roamex/browser/tabs",
@@ -118,6 +121,7 @@ test("roamex_browsertests") {
     "test/roamex_initial_url_edit_browsertest.cc",
     "test/roamex_initial_url_restore_browsertest.cc",
     "test/roamex_origin_storage_import_browsertest.cc",
+    "test/roamex_profile_creation_browsertest.cc",
     "test/roamex_reload_initial_url_browsertest.mm",
     "test/roamex_shortcuts_browsertest.mm",
     "test/roamex_tab_strip_bottom_layout_browsertest.cc",
@@ -148,8 +152,12 @@ test("roamex_browsertests") {
     "//components/services/storage/public/mojom",
     "//components/user_data_importer/common",
     "//content/test:test_support",
+    "//components/search_engines",
+    "//components/signin/public/base",
+    "//components/signin/public/identity_manager",
     "//net:test_support",
     "//roamex/browser/importer",
+    "//roamex/browser/profiles",
     "//roamex/browser/tab_visit",
     "//roamex/browser/tabs",
     "//roamex/common",
