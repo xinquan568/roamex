@@ -21,7 +21,8 @@ namespace {
 class RoamexSchemeRewriteTest : public testing::Test {
 protected:
   RoamexSchemeRewriteTest() {
-    url::AddStandardScheme(kRoamexScheme, url::SCHEME_WITH_HOST);
+    url::AddStandardScheme("roamux", url::SCHEME_WITH_HOST);
+    url::AddStandardScheme("roamex", url::SCHEME_WITH_HOST);
     url::AddStandardScheme("chrome", url::SCHEME_WITH_HOST);
   }
 
@@ -32,29 +33,29 @@ protected:
 // Pins the patch-0028 literal ↔ overlay-constant agreement and the registered
 // parse shape (host must not be empty once "roamex" is standard).
 TEST_F(RoamexSchemeRewriteTest, SchemeConstantPinsRegisteredParse) {
-  GURL url("roamex://about");
+  GURL url("roamux://about");
   EXPECT_EQ(kRoamexScheme, url.GetScheme());
   EXPECT_EQ(kRoamexAliasAboutHost, url.GetHost());
 }
 
 TEST_F(RoamexSchemeRewriteTest, RewritesAboutHostWhenEnabled) {
   features_.InitAndEnableFeature(features::kRoamexSchemeAlias);
-  GURL url("roamex://about");
+  GURL url("roamux://about");
   // Chaining idiom: the handler mutates in place but ALWAYS returns false.
   EXPECT_FALSE(MaybeRewriteRoamexAliasURL(&url, nullptr));
-  EXPECT_EQ("chrome://roamex-about/", url.spec());
+  EXPECT_EQ("chrome://roamux-about/", url.spec());
 }
 
 TEST_F(RoamexSchemeRewriteTest, RewritesFlagsPreservingPathAndRef) {
   features_.InitAndEnableFeature(features::kRoamexSchemeAlias);
-  GURL url("roamex://flags/#roamex-scheme-alias");
+  GURL url("roamux://flags/#roamux-scheme-alias");
   EXPECT_FALSE(MaybeRewriteRoamexAliasURL(&url, nullptr));
-  EXPECT_EQ("chrome://flags/#roamex-scheme-alias", url.spec());
+  EXPECT_EQ("chrome://flags/#roamux-scheme-alias", url.spec());
 }
 
 TEST_F(RoamexSchemeRewriteTest, LeavesUnmappedRoamexHostUntouched) {
   features_.InitAndEnableFeature(features::kRoamexSchemeAlias);
-  GURL url("roamex://settings");
+  GURL url("roamux://settings");
   const GURL original = url;
   EXPECT_FALSE(MaybeRewriteRoamexAliasURL(&url, nullptr));
   EXPECT_EQ(original, url);
@@ -64,7 +65,7 @@ TEST_F(RoamexSchemeRewriteTest, LeavesUnmappedRoamexHostUntouched) {
 // TARGET — are never touched.
 TEST_F(RoamexSchemeRewriteTest, NeverTouchesChromeUrls) {
   features_.InitAndEnableFeature(features::kRoamexSchemeAlias);
-  for (const char *spec : {"chrome://roamex-about/", "chrome://settings/",
+  for (const char *spec : {"chrome://roamux-about/", "chrome://settings/",
                            "chrome://about/", "chrome://flags/"}) {
     GURL url(spec);
     const GURL original = url;
@@ -85,6 +86,16 @@ TEST_F(RoamexSchemeRewriteTest, NeverTouchesWebSchemes) {
 // mapped hosts.
 TEST_F(RoamexSchemeRewriteTest, FlagOffIsInert) {
   features_.InitAndDisableFeature(features::kRoamexSchemeAlias);
+  GURL url("roamux://about");
+  const GURL original = url;
+  EXPECT_FALSE(MaybeRewriteRoamexAliasURL(&url, nullptr));
+  EXPECT_EQ(original, url);
+}
+
+// roam-93 dieback (D2a): the OLD roamex:// scheme is no longer aliased even
+// with the feature enabled — the curated map now speaks roamux:// only.
+TEST_F(RoamexSchemeRewriteTest, OldRoamexSchemeIsNoLongerAliased) {
+  features_.InitAndEnableFeature(features::kRoamexSchemeAlias);
   GURL url("roamex://about");
   const GURL original = url;
   EXPECT_FALSE(MaybeRewriteRoamexAliasURL(&url, nullptr));

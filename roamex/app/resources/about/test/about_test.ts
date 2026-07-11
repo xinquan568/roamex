@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-// roam-37: chrome://roamex-about WebUI tests against a TS-side fake proxy —
+// roam-37: chrome://roamux-about WebUI tests against a TS-side fake proxy —
 // the status matrix, Download→progress→Restart, Skip hides the card, NO
 // configuration/reset groups, identity + links. (TDD/P6.)
 
-import 'chrome://roamex-about/app.js';
+import 'chrome://roamux-about/app.js';
+// Populate loadTimeData with the REAL data-source values (productName,
+// version, updatesAvailable) — the element reads them at construction, and
+// the identity test pins the real brand string, not a test-injected one.
+// (roam-93 unbreak: first-ever execution of this suite surfaced the miss.)
+import 'chrome://roamux-about/strings.m.js';
 
-import {RoamexAboutAppElement} from 'chrome://roamex-about/app.js';
-import {BrowserProxyImpl} from 'chrome://roamex-about/browser_proxy.js';
-import type {BrowserProxy} from 'chrome://roamex-about/browser_proxy.js';
-import {UpdateStatus} from 'chrome://roamex-about/update_page.mojom-webui.js';
-import type {UpdateSnapshot} from 'chrome://roamex-about/update_page.mojom-webui.js';
+import {RoamexAboutAppElement} from 'chrome://roamux-about/app.js';
+import {BrowserProxyImpl} from 'chrome://roamux-about/browser_proxy.js';
+import type {BrowserProxy} from 'chrome://roamux-about/browser_proxy.js';
+import {UpdateStatus} from 'chrome://roamux-about/update_page.mojom-webui.js';
+import type {UpdateSnapshot} from 'chrome://roamux-about/update_page.mojom-webui.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {assertEquals, assertTrue, assertFalse} from 'chrome://webui-test/chai_assert.js';
 
 // A TS-side fake UpdatePageHandler + a snapshot pump (no C++/Mojo needed).
@@ -62,6 +68,13 @@ suite('RoamexAbout', function() {
 
   setup(async function() {
     fake = new FakeProxy();
+    // Force the update-card path on so the fake's onStateChanged listener is
+    // registered at connect. In a non-sparkle test build the real
+    // updatesAvailable is false, which would leave the card (and every card
+    // test) inert. productName is left as the real strings.m.js value so the
+    // identity test still pins the shipped brand. (roam-93 unbreak: this
+    // suite never ran before — the missing strings import failed construction.)
+    loadTimeData.overrideValues({updatesAvailable: true});
     // Inject before construction so no real Mojo bind ever fires (F3).
     BrowserProxyImpl.setInstance(fake);
     element = new RoamexAboutAppElement();
@@ -80,6 +93,11 @@ suite('RoamexAbout', function() {
 
   test('identity and links render', function() {
     assertTrue(!!q('productName'));
+    // roam-93: pin the brand TEXT, not just element presence — an
+    // existence-only check would pass either brand. (The <title> lives in
+    // about.html, which this mocha harness does not load, so it is not
+    // asserted here — the static title flip is self-evident in the diff.)
+    assertEquals('Roamux', q('productName')!.textContent.trim());
     assertTrue(!!q('version'));
     assertTrue(!!q('websiteLink'));
     assertTrue(!!q('githubLink'));
@@ -157,7 +175,7 @@ suite('RoamexAbout', function() {
     },
     {
       status: UpdateStatus.kUpToDate,
-      pill: 'Roamex is up to date',
+      pill: 'Roamux is up to date',
       present: ['statusPill', 'checkNow'],
       absent: ['spinner', 'updateCard', 'download', 'skip', 'restart',
                'progress', 'errorText'],

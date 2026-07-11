@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// roam-37: the chrome://roamex-about page — identity + links + update card +
+// roam-37: the chrome://roamux-about page — identity + links + update card +
 // check row, bound to roam-85's update state machine via the browser proxy.
 // Termixion's AboutSettings.tsx minus the configuration groups.
 
@@ -94,7 +94,7 @@ export class RoamexAboutAppElement extends CrLitElement {
       case UpdateStatus.kChecking:
         return 'Checking for updates…';
       case UpdateStatus.kUpToDate:
-        return 'Roamex is up to date';
+        return 'Roamux is up to date';
       case UpdateStatus.kAvailable:
         return 'Update available';
       case UpdateStatus.kDownloading:

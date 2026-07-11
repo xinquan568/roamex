@@ -100,9 +100,9 @@ class RoamexSigningConfigTest(unittest.TestCase):
             pass
         cls = roamex_signing_config.make_roamex_config_class(StubBase)
         cfg = cls()
-        self.assertEqual(cfg.product, "Roamex")
-        self.assertEqual(cfg.app_product, "Roamex")
-        self.assertEqual(cfg.base_bundle_id, "com.roamex.Roamex")
+        self.assertEqual(cfg.product, "Roamux")
+        self.assertEqual(cfg.app_product, "Roamux")
+        self.assertEqual(cfg.base_bundle_id, "com.roamux.Roamux")
 
     def test_get_parts_injects_sparkle_before_outer_app(self):
         keys = ["chromium_framework", "chromium_helper", "app"]  # app last
@@ -129,7 +129,7 @@ class RoamexSigningConfigTest(unittest.TestCase):
             def app_product(self):
                 return "Chromium"
         cls = roamex_signing_config.make_roamex_config_class(StubChromiumConfig)
-        self.assertEqual(cls().app_product, "Roamex")
+        self.assertEqual(cls().app_product, "Roamux")
 
 
 class CombinedOrderTest(unittest.TestCase):
@@ -161,54 +161,54 @@ class RenameBundleTest(unittest.TestCase):
                            "CFBundleName": "Chromium",
                            "CFBundleIdentifier": "org.chromium.Chromium"}, f)
         new = rename_bundle.rename_bundle(tmp / "Chromium.app")
-        self.assertEqual(new.name, "Roamex.app")
-        self.assertTrue((new / "Contents" / "MacOS" / "Roamex").is_file())
+        self.assertEqual(new.name, "Roamux.app")
+        self.assertTrue((new / "Contents" / "MacOS" / "Roamux").is_file())
         with open(new / "Contents" / "Info.plist", "rb") as f:
             plist = plistlib.load(f)
-        self.assertEqual(plist["CFBundleExecutable"], "Roamex")
-        self.assertEqual(plist["CFBundleName"], "Roamex")
-        self.assertEqual(plist["CFBundleIdentifier"], "com.roamex.Roamex")
+        self.assertEqual(plist["CFBundleExecutable"], "Roamux")
+        self.assertEqual(plist["CFBundleName"], "Roamux")
+        self.assertEqual(plist["CFBundleIdentifier"], "com.roamux.Roamux")
 
 
 class PackagingTest(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp(prefix="roamex-pkg-"))
         self.addCleanup(_rmtree, self.tmp)
-        app = self.tmp / "Roamex.app" / "Contents"
+        app = self.tmp / "Roamux.app" / "Contents"
         (app / "Frameworks" / "F.framework" / "Versions" / "B").mkdir(
             parents=True)
         os.symlink("B", app / "Frameworks" / "F.framework" / "Versions" /
                    "Current")
-        _exe(app / "MacOS" / "Roamex")
-        self.app = self.tmp / "Roamex.app"
+        _exe(app / "MacOS" / "Roamux")
+        self.app = self.tmp / "Roamux.app"
 
     def _assert_preserved(self, extracted_app):
         cur = (extracted_app / "Contents" / "Frameworks" / "F.framework" /
                "Versions" / "Current")
         self.assertTrue(cur.is_symlink(), "framework symlink lost")
-        exe = extracted_app / "Contents" / "MacOS" / "Roamex"
+        exe = extracted_app / "Contents" / "MacOS" / "Roamux"
         self.assertTrue(os.access(exe, os.X_OK), "exec bit lost")
 
     def test_zip_preserves_symlinks_and_exec_bits(self):
-        out = self.tmp / "Roamex.zip"
+        out = self.tmp / "Roamux.zip"
         package_roamex.package_zip(self.app, out)
         dest = self.tmp / "unzip"
         dest.mkdir()
         subprocess.run(["ditto", "-x", "-k", str(out), str(dest)], check=True)
-        self._assert_preserved(dest / "Roamex.app")
+        self._assert_preserved(dest / "Roamux.app")
 
     def test_dmg_preserves_symlinks_and_exec_bits(self):
         if not _has("hdiutil"):
             self.skipTest("hdiutil unavailable (non-macOS)")
-        out = self.tmp / "Roamex.dmg"
-        package_roamex.package_dmg(self.app, out, volname="Roamex")
+        out = self.tmp / "Roamux.dmg"
+        package_roamex.package_dmg(self.app, out, volname="Roamux")
         mount = subprocess.run(
             ["hdiutil", "attach", str(out), "-nobrowse", "-readonly",
              "-mountrandom", "/tmp"], capture_output=True, text=True,
             check=True)
         mnt = mount.stdout.strip().split("\t")[-1]
         try:
-            self._assert_preserved(pathlib.Path(mnt) / "Roamex.app")
+            self._assert_preserved(pathlib.Path(mnt) / "Roamux.app")
         finally:
             subprocess.run(["hdiutil", "detach", mnt], capture_output=True)
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Generate a Sparkle appcast.xml for a Roamex release (roam-34, K2/K3).
+"""Generate a Sparkle appcast.xml for a Roamux release (roam-34, K2/K3).
 
 One <item> with sparkle:version, pubDate, and an <enclosure> whose url is the
 signed ARTIFACT download URL (…/releases/download/<tag>/<artifact>, never the
@@ -17,7 +17,7 @@ from xml.sax.saxutils import quoteattr
 TEMPLATE = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>Roamex</title>
+    <title>Roamux</title>
     <item>
       <title>{version}</title>
       <sparkle:version>{version}</sparkle:version>

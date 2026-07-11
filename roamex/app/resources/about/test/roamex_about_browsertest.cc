@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-// roam-37: runs the chrome://roamex-about WebUI mocha tests (about_test.ts)
+// roam-37: runs the chrome://roamux-about WebUI mocha tests (about_test.ts)
 // against the TS-side fake page handler. The page is registered internal-only
 // (DefaultInternalWebUIConfig), so the test enables internal UIs first.
 
+#include "base/strings/stringprintf.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/test/base/web_ui_mocha_browser_test.h"
 #include "components/prefs/pref_service.h"
@@ -11,7 +12,7 @@
 
 class RoamexAboutBrowserTest : public WebUIMochaBrowserTest {
 public:
-  RoamexAboutBrowserTest() { set_test_loader_host("roamex-about"); }
+  RoamexAboutBrowserTest() { set_test_loader_host("roamux-about"); }
 
 protected:
   void RunTestCase(const std::string &test_case) {

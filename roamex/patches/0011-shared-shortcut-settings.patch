@@ -106,7 +106,7 @@ index 5e0a09805b..239128e96e 100644
 +        <template is="dom-if" if="[[roamexShortcutsEnabled_]]">
 +          <div class="cr-row">
 +            <div class="flex cr-padded-text" aria-hidden="true">
-+              Keyboard shortcuts (Roamex)
++              Keyboard shortcuts (Roamux)
 +            </div>
 +          </div>
 +          <div class="list-frame">

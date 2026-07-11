@@ -23,7 +23,7 @@ def package_zip(app_path, out_path):
     return out_path
 
 
-def package_dmg(app_path, out_path, volname="Roamex"):
+def package_dmg(app_path, out_path, volname="Roamux"):
     app_path = pathlib.Path(app_path)
     out_path = pathlib.Path(out_path)
     with tempfile.TemporaryDirectory(prefix="roamex-dmg-") as stage:
@@ -53,7 +53,7 @@ def main():
     parser.add_argument("--app", required=True)
     parser.add_argument("--zip")
     parser.add_argument("--dmg")
-    parser.add_argument("--volname", default="Roamex")
+    parser.add_argument("--volname", default="Roamux")
     args = parser.parse_args()
     if args.zip:
         package_zip(args.app, args.zip)

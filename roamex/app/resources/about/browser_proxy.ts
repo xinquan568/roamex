@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// roam-37: browser proxy for chrome://roamex-about — binds the update page to
+// roam-37: browser proxy for chrome://roamux-about — binds the update page to
 // roam-85's UpdatePageHandlerFactory (hands a UpdatePage remote + a handler
 // receiver via CreatePageHandler).
 

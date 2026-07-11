@@ -11,7 +11,7 @@ class BrowserContext;
 namespace roamex {
 
 // content::BrowserURLHandler forward rewriter (roam-91): rewrites the curated
-// alias map roamex://about → chrome://roamex-about and roamex://flags →
+// alias map roamux://about → chrome://roamux-about and roamux://flags →
 // chrome://flags when features::kRoamexSchemeAlias is enabled (checked per
 // call, so ScopedFeatureList toggles behave predictably). Follows the upstream
 // rewrite-then-return-false chaining idiom

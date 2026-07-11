@@ -24,10 +24,10 @@ index 89e745d043..5e0a09805b 100644
 +        <template is="dom-if" if="[[roamexTabStripPositionEnabled_]]">
 +          <div class="cr-row">
 +            <div class="flex cr-padded-text" aria-hidden="true">
-+              Tab strip position (Roamex)
++              Tab strip position (Roamux)
 +            </div>
 +            <settings-dropdown-menu id="roamexTabStripPosition"
-+                label="Tab strip position (Roamex)"
++                label="Tab strip position (Roamux)"
 +                pref="{{prefs.roamex.tabs.strip_position}}"
 +                menu-options="[[roamexTabStripPositionOptions_]]">
 +            </settings-dropdown-menu>

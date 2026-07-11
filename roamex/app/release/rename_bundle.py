@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
-"""roam-33: rename an unbranded Chromium.app to Roamex.app for release.
+"""roam-33: rename an unbranded Chromium.app to Roamux.app for release.
 
 The reference build is unbranded (is_chrome_branded=false) so the product is
 Chromium.app; rather than pull Google branding surgery, the release pipeline
-renames the built bundle: the .app dir, the main executable, the helper apps,
-and the Info.plist CFBundleName/CFBundleExecutable/CFBundleIdentifier. Signing
-happens AFTER this rename so the seal covers the final names.
+renames the built bundle: the .app dir, the main executable, and the
+Info.plist CFBundleName/CFBundleExecutable/CFBundleIdentifier. Helper apps
+under Contents/Frameworks keep their Chromium names (sign_chrome re-signs
+them as-is; roam-93 confirmed the code path). Signing happens AFTER this
+rename so the seal covers the final names.
 """
 
 import argparse
@@ -15,8 +17,8 @@ import shutil
 import sys
 
 OLD = "Chromium"
-NEW = "Roamex"
-NEW_BUNDLE_ID = "com.roamex.Roamex"
+NEW = "Roamux"
+NEW_BUNDLE_ID = "com.roamux.Roamux"
 
 
 def _rewrite_plist(info_plist):
@@ -35,7 +37,7 @@ def _rewrite_plist(info_plist):
 
 
 def rename_bundle(app_path):
-    """Rename Chromium.app -> Roamex.app in place; returns the new path."""
+    """Rename Chromium.app -> Roamux.app in place; returns the new path."""
     app_path = pathlib.Path(app_path)
     contents = app_path / "Contents"
     macos = contents / "MacOS"

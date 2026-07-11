@@ -7,7 +7,7 @@
 +
 +  // ROAMEX(roam-91): the product scheme alias ("roamex://about" et al.) —
 +  // parse-only registration; the rewrite lives in //roamex/browser/scheme.
-+  schemes->standard_schemes.push_back("roamex");
++  schemes->standard_schemes.push_back("roamux");
  
  #if BUILDFLAG(IS_ANDROID)
    schemes->referrer_schemes.push_back(content::kAndroidAppScheme);
@@ -20,7 +20,7 @@
 +      // ROAMEX(roam-91): browser-handled → renderers can't request roamex://
 +      // (CanRequestURL tail) and unrewritten roamex:// URLs are dropped
 +      // instead of reaching the OS external-protocol path.
-+      "roamex",
++      "roamux",
  #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
      BUILDFLAG(IS_CHROMEOS)
        webapps::kIsolatedAppScheme,

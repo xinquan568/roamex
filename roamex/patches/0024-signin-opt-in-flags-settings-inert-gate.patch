@@ -153,9 +153,9 @@
 +    // roamex.signin.optional_entry_point_enabled (E5). Functional sign-in
 +    // additionally requires a keyed-and-authorized build (three-state
 +    // honesty, plan §7.3).
-+    {"roamex-signin-opt-in", "Roamex: optional sign-in entry point",
++    {"roamex-signin-opt-in", "Roamux: optional sign-in entry point",
 +     "Re-exposes the Chromium sign-in/sync surfaces on the next launch, as if "
-+     "the Roamex opt-in preference were enabled. Sign-in stays "
++     "the Roamux opt-in preference were enabled. Sign-in stays "
 +     "inert-with-explanation unless the build is keyed and authorized.",
 +     kOsMac | kOsWin | kOsLinux, SINGLE_VALUE_TYPE(roamex::switches::kSigninOptIn)},
  // Include generated flags for flag unexpiry; see //docs/flag_expiry.md and
@@ -211,7 +211,7 @@
 +        <template is="dom-if" if="[[roamexSigninOptInEnabled_]]">
 +          <settings-toggle-button id="roamexSigninOptIn"
 +              pref="{{prefs.roamex.signin.optional_entry_point_enabled}}"
-+              label="Optional Google sign-in entry point (Roamex)"
++              label="Optional Google sign-in entry point (Roamux)"
 +              sub-label="Off by default. Re-exposes the Chromium sign-in/sync surfaces after you relaunch. Functional sign-in additionally requires a build with Google API keys and Google authorization; otherwise the surfaces explain why sign-in is unavailable.">
 +          </settings-toggle-button>
          </template>

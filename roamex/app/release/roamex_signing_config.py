@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""roam-33: the Roamex extension of Chromium's mac signing config (F5).
+"""roam-33: the Roamux extension of Chromium's mac signing config (F5).
 
 `RoamexCodeSignConfig` overrides the product/bundle-id names so
-`chrome/installer/mac/sign_chrome.py` operates on the renamed Roamex.app, and
+`chrome/installer/mac/sign_chrome.py` operates on the renamed Roamux.app, and
 `roamex_get_parts()` injects the Sparkle framework + its nested code into
 Chromium's parts dict BEFORE the outer app (which Chromium's pipeline signs
 last, keeping the outer seal valid). Kept import-light so it is unit-testable
@@ -27,21 +27,21 @@ ENTITLEMENTS_DIR = pathlib.Path(__file__).resolve().parent / "entitlements"
 
 
 def make_roamex_config_class(base_cls):
-    """Given Chromium's CodeSignConfig, return a Roamex subclass. Split out so
+    """Given Chromium's CodeSignConfig, return a Roamux subclass. Split out so
     it can be unit-tested with a stub base (no Chromium checkout required)."""
 
     class RoamexCodeSignConfig(base_cls):
         @property
         def product(self):
-            return "Roamex"
+            return "Roamux"
 
         @property
         def app_product(self):
-            return "Roamex"
+            return "Roamux"
 
         @property
         def base_bundle_id(self):
-            return "com.roamex.Roamex"
+            return "com.roamux.Roamux"
 
     return RoamexCodeSignConfig
 

@@ -22,7 +22,7 @@ RoamexAboutUI::RoamexAboutUI(content::WebUI *web_ui)
   content::WebUIDataSource *source = content::WebUIDataSource::CreateAndAdd(
       Profile::FromWebUI(web_ui), kChromeUIRoamexAboutHost);
 
-  source->AddString("productName", "Roamex");
+  source->AddString("productName", "Roamux");
   source->AddString("version", std::string(version_info::GetVersionNumber()));
 
   // The live update card is available only when the Sparkle-backed service is

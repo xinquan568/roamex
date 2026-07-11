@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Roamex release pipeline (roam-33 / §12.6 tier-3). Secrets live ONLY in the
+# Roamux release pipeline (roam-33 / §12.6 tier-3). Secrets live ONLY in the
 # protected `release` Environment (gated to protected refs + v* tags). Builds
 # universal2, resolves the signing mode (all Apple secrets -> signed; none ->
 # deliberate unsigned personal-alpha; partial -> fail-fast), signs inside-out
@@ -51,7 +51,7 @@ jobs:
           echo "signing mode: ${MODE}"
           echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
 
-      - name: Build universal2 Roamex.app
+      - name: Build universal2 Roamux.app
         run: |
           set -euo pipefail
           symlink="${CHROMIUM_SRC}/roamex"
@@ -67,8 +67,8 @@ jobs:
             "${CHROMIUM_SRC}/out/Release-x64/Chromium.app" \
             "${CHROMIUM_SRC}/out/Release/Chromium.app"
           python3 roamex/app/release/rename_bundle.py --app "${CHROMIUM_SRC}/out/Release/Chromium.app"
-          app="${CHROMIUM_SRC}/out/Release/Roamex.app"
-          archs="$(lipo -archs "${app}/Contents/MacOS/Roamex")"
+          app="${CHROMIUM_SRC}/out/Release/Roamux.app"
+          archs="$(lipo -archs "${app}/Contents/MacOS/Roamux")"
           echo "universal2 archs: ${archs}"
           case "${archs}" in
             *x86_64*arm64*|*arm64*x86_64*) echo "universal2 OK" ;;
@@ -111,8 +111,8 @@ jobs:
         run: |
           python3 roamex/app/release/package_roamex.py \
             --app "${ROAMEX_APP}" \
-            --zip "${CHROMIUM_SRC}/out/Release/Roamex.zip" \
-            --dmg "${CHROMIUM_SRC}/out/Release/Roamex.dmg"
+            --zip "${CHROMIUM_SRC}/out/Release/Roamux.zip" \
+            --dmg "${CHROMIUM_SRC}/out/Release/Roamux.dmg"
 
       # --- roam-34: the update leg. The Sparkle EdDSA signature is required in
       # EVERY mode (K3) — gated on the Sparkle key's presence, NOT the Apple
@@ -131,12 +131,12 @@ jobs:
           rel="${CHROMIUM_SRC}/out/Release"
           # Sign the FINAL artifacts (byte-exact), then build the appcast whose
           # enclosure url is the per-tag artifact download URL.
-          for art in Roamex.zip Roamex.dmg; do
+          for art in Roamux.zip Roamux.dmg; do
             sig="$(python3 roamex/app/appcast/sign_update_wrapper.py               --sign-update-bin "$bin" --artifact "$rel/$art" --key-file "$keyfile")"
-            [ "$art" = "Roamex.zip" ] && ZIP_SIG="$sig"
+            [ "$art" = "Roamux.zip" ] && ZIP_SIG="$sig"
           done
-          url="https://github.com/xinquan568/roamex/releases/download/${TAG}/Roamex.zip"
-          python3 roamex/app/appcast/generate_appcast.py             --version "${TAG#v}" --enclosure-url "$url"             --artifact "$rel/Roamex.zip" --ed-signature "$ZIP_SIG"             --pub-date "$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"             --out "$rel/appcast.xml"
+          url="https://github.com/xinquan568/roamex/releases/download/${TAG}/Roamux.zip"
+          python3 roamex/app/appcast/generate_appcast.py             --version "${TAG#v}" --enclosure-url "$url"             --artifact "$rel/Roamux.zip" --ed-signature "$ZIP_SIG"             --pub-date "$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"             --out "$rel/appcast.xml"
           rm -f "$keyfile"
 
       - name: Create DRAFT release + staging-validate the DOWNLOADED assets
@@ -158,17 +158,17 @@ jobs:
           "$bindir/generate_keys" --account "$acct" -f "$keyfile"
           # Draft, non-prerelease; assets get per-tag download URLs.
           gh release create "$TAG" --draft --prerelease=false \
-            --title "Roamex ${TAG}" --notes "Roamex ${TAG}" \
-            "$rel/Roamex.dmg" "$rel/Roamex.zip" "$rel/appcast.xml"
+            --title "Roamux ${TAG}" --notes "Roamux ${TAG}" \
+            "$rel/Roamux.dmg" "$rel/Roamux.zip" "$rel/appcast.xml"
           # K2: validate the ACTUAL DRAFT ASSETS, not the local files — download
           # the appcast + artifact from the draft and verify those bytes against
           # the committed SUPublicEDKey via Sparkle's verifier, before publish.
           dl="${RUNNER_TEMP}/roamex-staging"
           mkdir -p "$dl"
           gh release download "$TAG" --pattern 'appcast.xml' \
-            --pattern 'Roamex.zip' --dir "$dl" --clobber
+            --pattern 'Roamux.zip' --dir "$dl" --clobber
           python3 roamex/app/appcast/verify_appcast.py \
-            --appcast "$dl/appcast.xml" --artifact "$dl/Roamex.zip" \
+            --appcast "$dl/appcast.xml" --artifact "$dl/Roamux.zip" \
             --public-key-plist roamex/app/sparkle-Info.plist \
             --sparkle-bin-dir "$bindir" --account "$acct"
 
@@ -186,8 +186,8 @@ jobs:
         with:
           name: roamex-macos-universal2
           path: |
-            ${{ env.CHROMIUM_SRC }}/out/Release/Roamex.dmg
-            ${{ env.CHROMIUM_SRC }}/out/Release/Roamex.zip
+            ${{ env.CHROMIUM_SRC }}/out/Release/Roamux.dmg
+            ${{ env.CHROMIUM_SRC }}/out/Release/Roamux.zip
             ${{ env.CHROMIUM_SRC }}/out/Release/appcast.xml
 
       - name: Remove signing material

@@ -17,7 +17,7 @@ namespace roamex {
 
 class RoamexAboutUI;
 
-// chrome://roamex-about (roam-37): the About page + custom update UI, bound to
+// chrome://roamux-about (roam-37): the About page + custom update UI, bound to
 // roam-85's RoamexUpdateService via the UpdatePageHandlerFactory. The service
 // only compiles under roamex_enable_sparkle; flag-off the page still serves
 // (identity + links) with the update card degraded.

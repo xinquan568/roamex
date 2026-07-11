@@ -24,8 +24,8 @@ struct AliasRow {
   std::string_view chrome_host;
 };
 constexpr AliasRow kAliasMap[] = {
-    {kRoamexAliasAboutHost, kChromeUIRoamexAboutHost}, // roamex://about
-    {kRoamexAliasFlagsHost, "flags"},                  // roamex://flags
+    {kRoamexAliasAboutHost, kChromeUIRoamexAboutHost}, // roamux://about
+    {kRoamexAliasFlagsHost, "flags"},                  // roamux://flags
 };
 
 } // namespace

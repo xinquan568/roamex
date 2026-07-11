@@ -40,7 +40,7 @@ public:
 
   void SetUpOnMainThread() override {
     InProcessBrowserTest::SetUpOnMainThread();
-    // chrome://roamex-about is registered internal-only
+    // chrome://roamux-about is registered internal-only
     // (DefaultInternalWebUIConfig); without this pref HandleWebUI diverts it
     // to chrome://debug-webuis-disabled (same enablement roam-37's mocha
     // browsertest performs).
@@ -60,42 +60,46 @@ protected:
   base::test::ScopedFeatureList features_;
 };
 
-// AC1: a browser-initiated roamex://about commits chrome://roamex-about while
+// AC1: a browser-initiated roamux://about commits chrome://roamux-about while
 // the omnibox-visible virtual URL stays roamex://about.
 IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest,
                        AboutAliasLoadsAboutWebUI) {
   // 1-arg NavigateToURL succeeds iff the load is non-error and the observed
   // (virtual) URL equals the requested URL — i.e. the alias loads AND keeps
   // displaying as roamex://about.
-  EXPECT_TRUE(content::NavigateToURL(web_contents(), GURL("roamex://about")));
+  EXPECT_TRUE(content::NavigateToURL(web_contents(), GURL("roamux://about")));
   content::NavigationEntry *entry = last_entry();
   ASSERT_TRUE(entry);
   EXPECT_EQ(content::PAGE_TYPE_NORMAL, entry->GetPageType());
-  EXPECT_EQ(GURL("chrome://roamex-about/"), entry->GetURL());
-  EXPECT_EQ(GURL("roamex://about"), entry->GetVirtualURL());
+  EXPECT_EQ(GURL("chrome://roamux-about/"), entry->GetURL());
+  EXPECT_EQ(GURL("roamux://about"), entry->GetVirtualURL());
 }
 
 // AC2: roamex://flags aliases to the upstream flags surface.
 IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest,
                        FlagsAliasLoadsChromeFlags) {
-  EXPECT_TRUE(content::NavigateToURL(web_contents(), GURL("roamex://flags")));
+  EXPECT_TRUE(content::NavigateToURL(web_contents(), GURL("roamux://flags")));
   content::NavigationEntry *entry = last_entry();
   ASSERT_TRUE(entry);
   EXPECT_EQ(content::PAGE_TYPE_NORMAL, entry->GetPageType());
   EXPECT_EQ(GURL("chrome://flags/"), entry->GetURL());
-  EXPECT_EQ(GURL("roamex://flags"), entry->GetVirtualURL());
+  EXPECT_EQ(GURL("roamux://flags"), entry->GetVirtualURL());
 }
 
 // AC3: the alias target keeps working directly — committed URL asserted (not
-// just the virtual URL, which would mask an interstitial diversion).
+// just the virtual URL, which would mask an interstitial diversion). Also the
+// browser-level check that about.html's <title> carries the Roamux brand
+// (roam-93: the mocha harness cannot see about.html's title, so it is pinned
+// here at the real page load).
 IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest,
                        DirectChromeHostUnaffected) {
   EXPECT_TRUE(
-      content::NavigateToURL(web_contents(), GURL("chrome://roamex-about/")));
+      content::NavigateToURL(web_contents(), GURL("chrome://roamux-about/")));
   content::NavigationEntry *entry = last_entry();
   ASSERT_TRUE(entry);
   EXPECT_EQ(content::PAGE_TYPE_NORMAL, entry->GetPageType());
-  EXPECT_EQ(GURL("chrome://roamex-about/"), entry->GetURL());
+  EXPECT_EQ(GURL("chrome://roamux-about/"), entry->GetURL());
+  EXPECT_EQ(u"About Roamux", web_contents()->GetTitle());
 }
 
 // AC3: unmapped roamex:// hosts never alias into the chrome:// namespace —
@@ -105,7 +109,7 @@ IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest,
 // an OS external-protocol handoff.
 IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest, UnmappedHostDoesNotAlias) {
   EXPECT_FALSE(
-      content::NavigateToURL(web_contents(), GURL("roamex://settings")));
+      content::NavigateToURL(web_contents(), GURL("roamux://settings")));
   content::NavigationEntry *entry = last_entry();
   ASSERT_TRUE(entry);
   EXPECT_EQ(GURL("about:blank"), entry->GetURL());
@@ -122,10 +126,10 @@ IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest,
   ASSERT_TRUE(content::NavigateToURL(
       web_contents(), embedded_test_server()->GetURL("/title1.html")));
   EXPECT_FALSE(content::NavigateToURLFromRenderer(web_contents(),
-                                                  GURL("roamex://about")));
+                                                  GURL("roamux://about")));
   content::NavigationEntry *entry = last_entry();
   ASSERT_TRUE(entry);
-  EXPECT_NE(GURL("chrome://roamex-about/"), entry->GetURL());
+  EXPECT_NE(GURL("chrome://roamux-about/"), entry->GetURL());
 }
 
 // AC4 (D7 proof): redirects never alias — forward rewriting happens at
@@ -135,11 +139,11 @@ IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest,
                        ServerRedirectDoesNotAlias) {
   ASSERT_TRUE(embedded_test_server()->Start());
   const GURL redirect =
-      embedded_test_server()->GetURL("/server-redirect?roamex://about");
+      embedded_test_server()->GetURL("/server-redirect?roamux://about");
   EXPECT_FALSE(content::NavigateToURL(web_contents(), redirect));
   content::NavigationEntry *entry = last_entry();
   ASSERT_TRUE(entry);
-  EXPECT_NE(GURL("chrome://roamex-about/"), entry->GetURL());
+  EXPECT_NE(GURL("chrome://roamux-about/"), entry->GetURL());
 }
 
 // AC4 (D7 proof, renderer-initiated): web content driving the same server
@@ -152,18 +156,18 @@ IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest,
   ASSERT_TRUE(content::NavigateToURL(
       web_contents(), embedded_test_server()->GetURL("/title1.html")));
   const GURL redirect =
-      embedded_test_server()->GetURL("/server-redirect?roamex://about");
+      embedded_test_server()->GetURL("/server-redirect?roamux://about");
   EXPECT_FALSE(content::NavigateToURLFromRenderer(web_contents(), redirect));
   content::NavigationEntry *entry = last_entry();
   ASSERT_TRUE(entry);
-  EXPECT_NE(GURL("chrome://roamex-about/"), entry->GetURL());
+  EXPECT_NE(GURL("chrome://roamux-about/"), entry->GetURL());
 }
 
 // AC5 (D2b proof): flag-off is inert — no rewrite; the handled-scheme
 // navigation is dropped without commit (tab stays on about:blank) rather than
 // reaching the OS external-protocol path (P3: the feature ships disabled).
 // Internal UIs are enabled here too, so a rewrite bug (rather than the
-// internal-UI gate) would be what a chrome://roamex-about commit indicates.
+// internal-UI gate) would be what a chrome://roamux-about commit indicates.
 class RoamexSchemeAliasFlagOffBrowserTest : public InProcessBrowserTest {
 public:
   RoamexSchemeAliasFlagOffBrowserTest() {
@@ -183,11 +187,21 @@ protected:
 IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasFlagOffBrowserTest, FlagOffIsInert) {
   content::WebContents *wc =
       browser()->tab_strip_model()->GetActiveWebContents();
-  EXPECT_FALSE(content::NavigateToURL(wc, GURL("roamex://about")));
+  EXPECT_FALSE(content::NavigateToURL(wc, GURL("roamux://about")));
   content::NavigationEntry *entry = wc->GetController().GetLastCommittedEntry();
   ASSERT_TRUE(entry);
   EXPECT_EQ(GURL("about:blank"), entry->GetURL());
-  EXPECT_NE(GURL("chrome://roamex-about/"), entry->GetURL());
+  EXPECT_NE(GURL("chrome://roamux-about/"), entry->GetURL());
+}
+
+// roam-93 dieback (D2b): the OLD roamex:// scheme is dead — it never reaches
+// the About WebUI (back to unknown-scheme behavior; exact error surface not
+// asserted).
+IN_PROC_BROWSER_TEST_F(RoamexSchemeAliasBrowserTest, OldRoamexSchemeIsDead) {
+  EXPECT_FALSE(content::NavigateToURL(web_contents(), GURL("roamex://about")));
+  content::NavigationEntry *entry = last_entry();
+  ASSERT_TRUE(entry);
+  EXPECT_NE(GURL("chrome://roamux-about/"), entry->GetURL());
 }
 
 } // namespace

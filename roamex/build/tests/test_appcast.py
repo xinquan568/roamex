@@ -34,7 +34,7 @@ class AppcastGenerationTest(unittest.TestCase):
         self.sig_b64 = base64.b64encode(
             ed.signature(self.artifact, TEST_SEED, self.pub)).decode()
         self.url = ("https://github.com/xinquan568/roamex/releases/download/"
-                    "v99.0.0/Roamex.zip")
+                    "v99.0.0/Roamux.zip")
 
     def test_appcast_is_well_formed_and_signature_verifies(self):
         xml = generate_appcast.generate_appcast(
@@ -42,6 +42,8 @@ class AppcastGenerationTest(unittest.TestCase):
             artifact_bytes=self.artifact, ed_signature=self.sig_b64,
             pub_date="Thu, 01 Jan 2026 00:00:00 +0000")
         root = ET.fromstring(xml)
+        # roam-93: the Sparkle channel title carries the product brand.
+        self.assertEqual(root.find(".//channel/title").text, "Roamux")
         enc = root.find(".//enclosure")
         self.assertEqual(enc.get("url"), self.url)
         self.assertEqual(int(enc.get("length")), len(self.artifact))
@@ -121,13 +123,13 @@ class DraftPublishInvariantTest(unittest.TestCase):
                                         staging_validated=True)
 
     def test_plan_release_urls(self):
-        plan = release_flow.plan_release("v99.0.0", "Roamex.zip")
+        plan = release_flow.plan_release("v99.0.0", "Roamux.zip")
         self.assertIn("/releases/download/v99.0.0/appcast.xml",
                       plan["staging_feed_url"])
         self.assertTrue(plan["production_feed_url"].endswith(
             "/releases/latest/download/appcast.xml"))
         self.assertTrue(plan["enclosure_url"].endswith(
-            "/releases/download/v99.0.0/Roamex.zip"))
+            "/releases/download/v99.0.0/Roamux.zip"))
 
 
 def _verify(data, sig_b64, pub_b64):

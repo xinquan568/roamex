@@ -7,7 +7,7 @@ export function getHtml(this: RoamexAboutAppElement) {
   // clang-format off
   return html`
     <div class="identity">
-      <img class="icon" src="chrome://roamex-about/roamex_logo.png" alt="Roamex">
+      <img class="icon" src="chrome://roamux-about/roamex_logo.png" alt="Roamux">
       <h1 id="productName">${this.getProductName_()}</h1>
       <div id="version" class="version">${this.getVersion_()}</div>
     </div>

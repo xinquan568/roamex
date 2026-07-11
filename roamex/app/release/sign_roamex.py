@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """roam-33 sign driver — resolves the signing mode and, in signed mode, signs
-the universal2 Roamex.app inside-out with the Sparkle parts injected BEFORE the
+the universal2 Roamux.app inside-out with the Sparkle parts injected BEFORE the
 outer app (so the outer seal stays valid), then staples.
 
 Signed mode reuses Chromium's signing package (chrome/installer/mac) for the
@@ -97,8 +97,8 @@ def main():
               file=sys.stderr)
         return 2
 
-    # Build the Roamex-extended config over Chromium's real config class (the
-    # config seam) — sets Roamex.app product/bundle-id so sign_chrome operates
+    # Build the Roamux-extended config over Chromium's real config class (the
+    # config seam) — sets Roamux.app product/bundle-id so sign_chrome operates
     # on the renamed bundle — and derive the ordered part keys with Sparkle
     # injected before the outer app.
     chromium_src = os.environ.get("CHROMIUM_SRC", ".")
@@ -122,7 +122,7 @@ def main():
     # the base app + nested helpers + the OUTER APP LAST, sealing over Sparkle.
     sign_sparkle_parts(args.app, identity, args.dry_run)
     # Drive Chromium's signing package for the base app + its nested helpers +
-    # the outer app (last), with the Roamex outer entitlements + hardened
+    # the outer app (last), with the Roamux outer entitlements + hardened
     # runtime; sign_chrome derives the ordered parts from RoamexCodeSignConfig.
     _run([sys.executable,
           str(pathlib.Path(os.environ.get("CHROMIUM_SRC", "."))

@@ -26,7 +26,7 @@ bool ShouldInterceptInertSignin() {
 std::u16string GetInertSigninExplanation(BuildState state) {
   switch (state) {
     case BuildState::kKeyless:
-      return u"This Roamex build ships without Google API keys, so Google "
+      return u"This Roamux build ships without Google API keys, so Google "
              u"sign-in and sync cannot run. Profiles stay local and "
              u"isolated; no account is needed.";
     case BuildState::kKeyedUnauthorized:

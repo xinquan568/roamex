@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- SPDX-License-Identifier: Apache-2.0
-     roam-33: the outer Roamex.app entitlements under hardened runtime.
+     roam-33: the outer Roamux.app entitlements under hardened runtime.
      Library validation stays ON (no com.apple.security.cs.disable-library-validation)
      so only same-Team-ID code (incl. Sparkle's XPC services) loads. -->
 <plist version="1.0">
