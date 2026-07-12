@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: Apache-2.0
+     roam-32 (plan §13.6): Sparkle keys merged into the app Info.plist when
+     roamux_enable_sparkle=true. SUPublicEDKey is the real production Sparkle
+     EdDSA public key (minted in roam-34). The matching PRIVATE key lives only
+     in the protected release Environment as SPARKLE_ED_PRIVATE_KEY and is
+     never committed. Sparkle supports key rotation, never removal. -->
+<plist version="1.0">
+<dict>
+  <key>SUFeedURL</key>
+  <string>https://github.com/xinquan568/roamex/releases/latest/download/appcast.xml</string>
+  <key>SUPublicEDKey</key>
+  <string>VhHW37r/RYqzm5WITbR9sUN9a8PJjqs3p4Gx0bQ8zz4=</string>
+  <key>SUEnableAutomaticChecks</key>
+  <true/>
+  <key>SUScheduledCheckInterval</key>
+  <integer>86400</integer>
+</dict>
+</plist>

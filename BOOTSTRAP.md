@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-# Roamex — bootstrap & build (E0 foundation)
+# Roamux — bootstrap & build (E0 foundation)
 
-Roamex is a **Chromium/C++ overlay** — the code in this repo (`roamex/`) is layered onto an upstream
+Roamux is a **Chromium/C++ overlay** — the code in this repo (`roamux/`) is layered onto an upstream
 Chromium checkout; the Chromium source is **not** committed here (it's fetched with `depot_tools`).
-See the execution plan §11–§12 (`docs/discussion/2026-07-05-roamex-browser-features/FINAL.html`).
+See the execution plan §11–§12 (`docs/discussion/2026-07-05-roamux-browser-features/FINAL.html`).
 
 ## Prerequisites (build machine)
 
@@ -36,20 +36,20 @@ git fetch --tags
 git checkout <LATEST_STABLE_MILESTONE_TAG>   # Q(i4)-A: latest stable milestone; re-pin every cycle
 gclient sync -D                      # sync deps to the pinned tag; vendors gn/ninja
 ```
-Record the exact tag in `roamex/build/CHROMIUM_PIN` when you pick it.
+Record the exact tag in `roamux/build/CHROMIUM_PIN` when you pick it.
 
-## 3. Place the Roamex overlay into the Chromium tree + wire it into the build graph
+## 3. Place the Roamux overlay into the Chromium tree + wire it into the build graph
 
-The overlay is `codes/roamex/roamex/` → it must appear as `src/roamex/` in the checkout, **and** a root
-target must reference it (GN only loads `//roamex/BUILD.gn` if something depends on it):
+The overlay is `codes/roamux/roamux/` → it must appear as `src/roamux/` in the checkout, **and** a root
+target must reference it (GN only loads `//roamux/BUILD.gn` if something depends on it):
 ```sh
-ln -s /abs/path/to/codes/roamex/roamex ~/chromium/src/roamex
+ln -s /abs/path/to/codes/roamux/roamux ~/chromium/src/roamux
 # Apply ALL managed patches (0001 gn_all wiring, 0002 chromium_src redirect, ...) — idempotent, fail-loud:
-python3 ~/chromium/src/roamex/build/apply_patches.py --chromium-src ~/chromium/src
+python3 ~/chromium/src/roamux/build/apply_patches.py --chromium-src ~/chromium/src
 
-# Roamex (roam-32): vendor the pinned Sparkle.framework (needed by roamex_enable_sparkle=true
+# Roamux (roam-32): vendor the pinned Sparkle.framework (needed by roamux_enable_sparkle=true
 # builds — the flag-on GN targets fail loudly without it; hash-verified, see plan §13.6/R16).
-python3 ~/chromium/src/roamex/build/fetch_sparkle.py
+python3 ~/chromium/src/roamux/build/fetch_sparkle.py
 ```
 (A symlink keeps the git repo as the source of truth; a `gclient` custom-solution/DEPS entry is the
 alternative once the overlay stabilizes. The `patches/` entry becomes a `gclient` runhook later, §12.5.)
@@ -58,24 +58,24 @@ alternative once the overlay stabilizes. The `patches/` entry becomes a `gclient
 
 ```sh
 cd ~/chromium/src
-mkdir -p out/Default && cp roamex/build/args/reference.gn out/Default/args.gn  # args.gn keeps comments/newlines
+mkdir -p out/Default && cp roamux/build/args/reference.gn out/Default/args.gn  # args.gn keeps comments/newlines
 gn gen out/Default
-autoninja -C out/Default roamex_unittests   # the E0 hello-world test target (roam-1); first build is ~hours
-out/Default/roamex_unittests                # both RoamexSmokeTest cases should pass
+autoninja -C out/Default roamux_unittests   # the E0 hello-world test target (roam-1); first build is ~hours
+out/Default/roamux_unittests                # both RoamuxSmokeTest cases should pass
 ```
 > Use `out/Default/args.gn` — **not** `--args="$(tr '\n' ' ' …)"`; collapsing the arg file to one line turns
 > its first `#` comment into a comment that swallows the rest. Full Chromium builds are hours — always build
 > the **touched target + its test target**, never `all` (CI trust tiers, §12.6). A `test()` target needs a
-> linked `main` (`//base/test:run_all_unittests`) — already wired in `roamex/BUILD.gn`.
+> linked `main` (`//base/test:run_all_unittests`) — already wired in `roamux/BUILD.gn`.
 
 ## Status of this repo (E0 foundation)
 
 Bootstrap completed on the build machine:
 - ✅ depot_tools installed + persisted; full Xcode 26.6 active.
-- ✅ **Built green** — `roamex_unittests` compiles and both `RoamexSmokeTest` cases pass (roam-1 acceptance met).
-- ✅ Overlay symlinked into `src/roamex`; the `//roamex` build-graph wiring is
-  `roamex/patches/0001-gn-all-add-roamex-targets.patch`.
-- ✅ **Pinned to the latest stable milestone `149.0.7827.201` (M149)** per Q(i4)-A — see `roamex/build/CHROMIUM_PIN`.
+- ✅ **Built green** — `roamux_unittests` compiles and both `RoamuxSmokeTest` cases pass (roam-1 acceptance met).
+- ✅ Overlay symlinked into `src/roamux`; the `//roamux` build-graph wiring is
+  `roamux/patches/0001-gn-all-add-roamux-targets.patch`.
+- ✅ **Pinned to the latest stable milestone `149.0.7827.201` (M149)** per Q(i4)-A — see `roamux/build/CHROMIUM_PIN`.
   (First build was verified on tip 152.0.7936.0, then re-pinned to stable.)
 
 Next: E0 roam-2..5, then E7 (governance), then the feature epics via `/issue2pr chain --label <epic>`.

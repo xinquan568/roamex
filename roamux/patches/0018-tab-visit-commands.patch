@@ -1,0 +1,66 @@
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -55,6 +55,7 @@
+ #include "chrome/browser/ui/browser_actions.h"
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "roamux/browser/tabs/reload_initial_url_command.h"
++#include "roamux/browser/tab_visit/tab_visit_command.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/browser_finder.h"
+ #include "chrome/browser/ui/browser_window.h"
+@@ -666,6 +667,13 @@
+     case IDC_RELOAD_INITIAL_URL:
+       roamux::tabs::ReloadInitialUrl(browser_);
+       break;
++    // Roamux (roam-25): E4 tab visit-order navigation Back/Forward steps.
++    case IDC_TAB_VISIT_BACK:
++      roamux::tab_visit::TabVisitBack(browser_);
++      break;
++    case IDC_TAB_VISIT_FORWARD:
++      roamux::tab_visit::TabVisitForward(browser_);
++      break;
+     case IDC_VERTICAL_TABS_SEND_FEEDBACK:
+       chrome::ShowFeedbackPage(browser_, feedback::kFeedbackSourceVerticalTabs,
+                                /*description_template=*/"",
+@@ -1607,6 +1615,11 @@
+   // Roamux (roam-12): dynamic — refreshed in UpdateCommandsForTabState.
+   command_updater_.UpdateCommandEnabled(
+       IDC_RELOAD_INITIAL_URL, roamux::tabs::CanReloadInitialUrl(browser_));
++  // Roamux (roam-25): dynamic — refreshed in UpdateCommandsForTabState.
++  command_updater_.UpdateCommandEnabled(
++      IDC_TAB_VISIT_BACK, roamux::tab_visit::CanTabVisitBack(browser_));
++  command_updater_.UpdateCommandEnabled(
++      IDC_TAB_VISIT_FORWARD, roamux::tab_visit::CanTabVisitForward(browser_));
+ #if BUILDFLAG(IS_CHROMEOS)
+   command_updater_.UpdateCommandEnabled(IDC_TOGGLE_MULTITASK_MENU, true);
+   command_updater_.UpdateCommandEnabled(IDC_MINIMIZE_WINDOW, true);
+@@ -1970,6 +1983,12 @@
+   // Roamux (roam-12): the reload-initial-url command follows the active tab.
+   command_updater_.UpdateCommandEnabled(
+       IDC_RELOAD_INITIAL_URL, roamux::tabs::CanReloadInitialUrl(browser_));
++  // Roamux (roam-25): tab visit-order Back/Forward enablement tracks the
++  // traversal state (a landable step exists after/before the cursor).
++  command_updater_.UpdateCommandEnabled(
++      IDC_TAB_VISIT_BACK, roamux::tab_visit::CanTabVisitBack(browser_));
++  command_updater_.UpdateCommandEnabled(
++      IDC_TAB_VISIT_FORWARD, roamux::tab_visit::CanTabVisitForward(browser_));
+   if (!current_web_contents) {  // May be NULL during tab restore.
+     return;
+   }
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -5705,6 +5705,14 @@
+   sources += [
+     "//roamux/browser/tabs/reload_initial_url_command.cc",
+     "//roamux/browser/tabs/reload_initial_url_command.h",
++  ]
++
++  # Roamux (roam-25): the E4 tab-visit Back/Forward command behavior (needs
++  # Browser*). It forwards to the per-profile traversal coordinator, which is
++  # compiled into //chrome/browser/ui/tabs (a lower target this depends on).
++  sources += [
++    "//roamux/browser/tab_visit/tab_visit_command.cc",
++    "//roamux/browser/tab_visit/tab_visit_command.h",
+   ]
+ }
+ 

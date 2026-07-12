@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: Apache-2.0
+import("//roamux/build/buildflags.gni")
+
+source_set("about") {
+  sources = [
+    "roamux_about_ui.cc",
+    "roamux_about_ui.h",
+  ]
+  deps = [
+    "//base",
+    "//chrome/browser/profiles:profile",
+    "//components/version_info",
+    "//content/public/browser",
+    "//roamux/app:app_buildflags",
+    "//roamux/common",
+    "//roamux/mojom",
+    "//ui/webui",
+  ]
+  if (roamux_enable_sparkle) {
+    deps += [ "//roamux/browser/updates:update_state_machine" ]
+  }
+  public_deps = [ "//roamux/mojom" ]
+}

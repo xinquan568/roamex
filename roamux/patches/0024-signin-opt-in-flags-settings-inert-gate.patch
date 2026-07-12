@@ -1,0 +1,258 @@
+--- a/chrome/browser/signin/signin_ui_util.cc
++++ b/chrome/browser/signin/signin_ui_util.cc
+@@ -4,6 +4,8 @@
+ 
+ #include "chrome/browser/signin/signin_ui_util.h"
+ 
++#include "roamux/browser/ui/signin/signin_inert_dialog.h"
++
+ #include "base/auto_reset.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback.h"
+@@ -179,6 +181,11 @@
+ void ShowReauthForPrimaryAccountWithAuthError(
+     Profile* profile,
+     signin_metrics::AccessPoint access_point) {
++  // Roamux (roam-31): keyless / keyed-but-unauthorized builds intercept
++  // sign-in initiation with an explanation (never a silent dead button).
++  if (roamux::signin_ui::MaybeInterceptInertSignin(profile)) {
++    return;
++  }
+   signin::IdentityManager* identity_manager =
+       IdentityManagerFactory::GetForProfile(profile);
+   CoreAccountInfo primary_account_info =
+@@ -193,6 +200,11 @@
+ void ShowReauthForAccount(Profile* profile,
+                           const std::string& email,
+                           signin_metrics::AccessPoint access_point) {
++  // Roamux (roam-31): keyless / keyed-but-unauthorized builds intercept
++  // sign-in initiation with an explanation (never a silent dead button).
++  if (roamux::signin_ui::MaybeInterceptInertSignin(profile)) {
++    return;
++  }
+ #if BUILDFLAG(IS_CHROMEOS)
+   ash::AccountManagerFactory::Get()
+       ->GetAccountManagerFacade(profile->GetPath().value())
+@@ -212,6 +224,11 @@
+ void ShowExtensionSigninPrompt(Profile* profile,
+                                bool enable_sync,
+                                const std::string& email_hint) {
++  // Roamux (roam-31): keyless / keyed-but-unauthorized builds intercept
++  // sign-in initiation with an explanation (never a silent dead button).
++  if (roamux::signin_ui::MaybeInterceptInertSignin(profile)) {
++    return;
++  }
+ #if BUILDFLAG(IS_CHROMEOS)
+   NOTREACHED();
+ #elif BUILDFLAG(ENABLE_DICE_SUPPORT)
+@@ -249,6 +266,11 @@
+ 
+ void ShowSigninPromptFromPromo(Profile* profile,
+                                signin_metrics::AccessPoint access_point) {
++  // Roamux (roam-31): keyless / keyed-but-unauthorized builds intercept
++  // sign-in initiation with an explanation (never a silent dead button).
++  if (roamux::signin_ui::MaybeInterceptInertSignin(profile)) {
++    return;
++  }
+ #if BUILDFLAG(IS_CHROMEOS)
+   NOTREACHED();
+ #elif BUILDFLAG(ENABLE_DICE_SUPPORT)
+@@ -271,6 +293,11 @@
+ void SignInFromSingleAccountPromo(Profile* profile,
+                                   const CoreAccountInfo& account,
+                                   signin_metrics::AccessPoint access_point) {
++  // Roamux (roam-31): keyless / keyed-but-unauthorized builds intercept
++  // sign-in initiation with an explanation (never a silent dead button).
++  if (roamux::signin_ui::MaybeInterceptInertSignin(profile)) {
++    return;
++  }
+ #if BUILDFLAG(ENABLE_DICE_SUPPORT)
+   DCHECK(!profile->IsOffTheRecord());
+ 
+@@ -331,6 +358,11 @@
+     Profile* profile,
+     const CoreAccountInfo& account,
+     signin_metrics::AccessPoint access_point) {
++  // Roamux (roam-31): keyless / keyed-but-unauthorized builds intercept
++  // sign-in initiation with an explanation (never a silent dead button).
++  if (roamux::signin_ui::MaybeInterceptInertSignin(profile)) {
++    return;
++  }
+   EnableSyncFromMultiAccountPromo(profile, account, access_point,
+                                   /*is_default_promo_account=*/true);
+ }
+@@ -339,6 +371,11 @@
+                                      const CoreAccountInfo& account,
+                                      signin_metrics::AccessPoint access_point,
+                                      bool is_default_promo_account) {
++  // Roamux (roam-31): keyless / keyed-but-unauthorized builds intercept
++  // sign-in initiation with an explanation (never a silent dead button).
++  if (roamux::signin_ui::MaybeInterceptInertSignin(profile)) {
++    return;
++  }
+ #if BUILDFLAG(ENABLE_DICE_SUPPORT)
+   DCHECK(!profile->IsOffTheRecord());
+ 
+@@ -646,6 +683,10 @@
+ void SignInAndEnableHistorySync(BrowserWindowInterface* browser,
+                                 Profile* profile,
+                                 signin_metrics::AccessPoint access_point) {
++  // Roamux (roam-31): see MaybeInterceptInertSignin above.
++  if (roamux::signin_ui::MaybeInterceptInertSignin(profile)) {
++    return;
++  }
+ #if !BUILDFLAG(IS_CHROMEOS)
+   syncer::SyncService* sync_service =
+       SyncServiceFactory::GetForProfile(profile);
+--- a/chrome/browser/signin/BUILD.gn
++++ b/chrome/browser/signin/BUILD.gn
+@@ -203,6 +203,7 @@
+   ]
+   deps = [
+     "//roamux/browser/signin",
++    "//components/constrained_window",
+     "//chrome/browser:global_features",
+     "//chrome/browser/autofill",
+     "//chrome/browser/bookmarks",
+@@ -318,6 +319,8 @@
+       "signin_promo.cc",
+       "signin_promo_util.cc",
+       "signin_ui_util.cc",
++      "//roamux/browser/ui/signin/signin_inert_dialog.cc",
++      "//roamux/browser/ui/signin/signin_inert_dialog.h",
+     ]
+     deps += [
+       ":signin_promo",
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -649,6 +649,7 @@
+   ]
+ 
+   deps = [
++    "//roamux/common",
+     ":active_use_util",
+     ":browser_features",
+     ":browser_process",
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -6,6 +6,9 @@
+ // https://chromium.googlesource.com/chromium/src/+/main/docs/how_to_add_your_feature_flag.md#step-2_adding-the-feature-flag-to-the-chrome_flags-ui
+ 
+ #include "chrome/browser/about_flags.h"
++
++#include "roamux/common/roamux_switches.h"
++#include "roamux/common/roamux_features.h"
+ 
+ #include <iterator>
+ #include <map>
+@@ -4740,6 +4743,15 @@
+ //
+ // When adding a new choice, add it to the end of the list.
+ const FeatureEntry kFeatureEntries[] = {
++    // Roamux (roam-31): developer mirror of
++    // roamux.signin.optional_entry_point_enabled (E5). Functional sign-in
++    // additionally requires a keyed-and-authorized build (three-state
++    // honesty, plan §7.3).
++    {"roamux-signin-opt-in", "Roamux: optional sign-in entry point",
++     "Re-exposes the Chromium sign-in/sync surfaces on the next launch, as if "
++     "the Roamux opt-in preference were enabled. Sign-in stays "
++     "inert-with-explanation unless the build is keyed and authorized.",
++     kOsMac | kOsWin | kOsLinux, SINGLE_VALUE_TYPE(roamux::switches::kSigninOptIn)},
+ // Include generated flags for flag unexpiry; see //docs/flag_expiry.md and
+ // //tools/flags/generate_unexpire_flags.py.
+ #include "build/chromeos_buildflags.h"
+@@ -13376,6 +13388,12 @@
+ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
+                                        const FeatureEntry& entry) {
+   version_info::Channel channel = chrome::GetChannel();
++  // Roamux (roam-31): the sign-in opt-in mirror exists only while the E5
++  // epic flag is on — flag-off builds show no Roamux flags row.
++  if (std::string_view("roamux-signin-opt-in") == entry.internal_name &&
++      !base::FeatureList::IsEnabled(roamux::features::kBraveStyleProfiles)) {
++    return true;
++  }
+ #if BUILDFLAG(IS_CHROMEOS)
+   // enable-ui-devtools is only available on for non Stable channels.
+   if (std::string_view(ui_devtools::switches::kEnableUiDevTools) ==
+--- a/chrome/browser/flag-metadata.json
++++ b/chrome/browser/flag-metadata.json
+@@ -8429,6 +8429,11 @@
+       "expiry_milestone": 150
+   },
+   {
++    "name": "roamux-signin-opt-in",
++    "owners": [ "xinquan568" ],
++    "expiry_milestone": -1
++  },
++  {
+     "name": "saas-usage-reporting",
+     "owners": [ "janzarzycki@google.com", "igorruvinov@chromium.org" ],
+     "expiry_milestone": 152
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -206,6 +206,9 @@
+   s_allowlist = new PrefsUtil::TypedPrefMap();
+ 
+   // Roamux (roam-6; the key literal mirrors roamux/common/roamux_prefs.h).
++  // Roamux (roam-31): the E5 sign-in opt-in toggle.
++  (*s_allowlist)["roamux.signin.optional_entry_point_enabled"] =
++      settings_api::PrefType::kBoolean;
+   (*s_allowlist)["roamux.tabs.strip_position"] =
+       settings_api::PrefType::kNumber;
+ 
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.html
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html
+@@ -180,6 +180,14 @@
+                 menu-options="[[roamuxTabStripPositionOptions_]]">
+             </settings-dropdown-menu>
+           </div>
++        </template>
++
++        <template is="dom-if" if="[[roamuxSigninOptInEnabled_]]">
++          <settings-toggle-button id="roamuxSigninOptIn"
++              pref="{{prefs.roamux.signin.optional_entry_point_enabled}}"
++              label="Optional Google sign-in entry point (Roamux)"
++              sub-label="Off by default. Re-exposes the Chromium sign-in/sync surfaces after you relaunch. Functional sign-in additionally requires a build with Google API keys and Google authorization; otherwise the surfaces explain why sign-in is unavailable.">
++          </settings-toggle-button>
+         </template>
+ 
+         <template is="dom-if" if="[[showVerticalTabsEnabled_]]">
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+@@ -242,6 +242,14 @@
+         },
+       },
+ 
++      // Roamux (roam-31): the E5 sign-in opt-in toggle rides the same page.
++      roamuxSigninOptInEnabled_: {
++        type: Boolean,
++        value() {
++          return loadTimeData.getBoolean('roamuxSigninOptInEnabled');
++        },
++      },
++
+       roamuxTabStripPositionOptions_: {
+         type: Array,
+         value() {
+@@ -333,6 +341,7 @@
+   declare private isWallpaperPolicyControlled_: boolean;
+   declare private fontSizeOptions_: DropdownMenuOptionList;
+   declare private roamuxTabStripPositionEnabled_: boolean;
++  declare private roamuxSigninOptInEnabled_: boolean;
+   declare private roamuxTabStripPositionOptions_: DropdownMenuOptionList;
+   declare private colorSchemeModeOptions_:
+       Array<{value: ColorSchemeMode, name: string}>;
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -589,6 +589,11 @@
+   html_source->AddBoolean("roamuxTabStripPositionEnabled",
+                           base::FeatureList::IsEnabled(
+                               roamux::features::kTabStripPosition));
++  // Roamux (roam-31): the E5 opt-in toggle is visible iff the epic flag is
++  // on (it must stay reachable while the sign-in surfaces are suppressed).
++  html_source->AddBoolean("roamuxSigninOptInEnabled",
++                          base::FeatureList::IsEnabled(
++                              roamux::features::kBraveStyleProfiles));
+   html_source->AddBoolean("showVerticalTabsExpandOnHoverEnabled",
+                           tabs::IsVerticalTabsExpandOnHoverFeatureEnabled());
+   html_source->AddBoolean(

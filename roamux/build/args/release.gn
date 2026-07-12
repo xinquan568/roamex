@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Roamux RELEASE build args (roam-33 / E6, plan §11.10, §13.6). Per-arch slices
+# are built with target_cpu=arm64 and target_cpu=x64, then merged into a
+# universal2 Roamux.app by chrome/installer/mac/universalizer.py.
+# Use: gn gen out/Release-<cpu> --args="$(tr '\n' ' ' < roamux/build/args/release.gn) target_cpu=\"<cpu>\""
+
+is_chrome_branded = false        # unbranded (no Google keys; §7.3)
+is_official_build = true         # release optimization + the packaged .app shape
+is_debug = false
+is_component_build = false       # a distributable single-framework bundle
+symbol_level = 1
+target_os = "mac"
+# target_cpu is supplied per-slice on the gn gen command line (arm64 / x64).
+
+# roam-32: bundle Sparkle + compile the updater in release artifacts.
+roamux_enable_sparkle = true

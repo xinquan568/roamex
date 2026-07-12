@@ -1,0 +1,14 @@
+diff --git a/chrome/common/chrome_constants.h b/chrome/common/chrome_constants.h
+index 0b4d8017c0..fcdeff3795 100644
+--- a/chrome/common/chrome_constants.h
++++ b/chrome/common/chrome_constants.h
+@@ -7,6 +7,9 @@
+ #ifndef CHROME_COMMON_CHROME_CONSTANTS_H_
+ #define CHROME_COMMON_CHROME_CONSTANTS_H_
+ 
++// Roamux (roam-2): sample one-line patch proving the patches/ runhook.
++#define ROAMUX_SAMPLE_PATCH_ACTIVE 1
++
+ #include <stddef.h>
+ 
+ #include "base/files/file_path.h"

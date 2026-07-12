@@ -1,7 +1,7 @@
 # git-cliff config (roam-40, §7.9). Renders CHANGELOG.md from Conventional-Commit history — coherent
 # because roam-38 ENFORCES Conventional Commits. Groups cover roam-38's exact enforced type set.
 [changelog]
-header = "# Changelog\n\nAll notable changes to Roamex. Generated from Conventional-Commit history by git-cliff.\n"
+header = "# Changelog\n\nAll notable changes to Roamux. Generated from Conventional-Commit history by git-cliff.\n"
 body = """
 {% if version %}## [{{ version }}] - {{ timestamp | date(format="%Y-%m-%d") }}{% else %}## [unreleased]{% endif %}
 {% for group, commits in commits | group_by(attribute="group") %}

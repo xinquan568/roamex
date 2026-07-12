@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Roamux test feed (FIXTURE — dev/test key, roam-32)</title>
+    <item>
+      <title>99.0.0</title>
+      <sparkle:version>99.0.0</sparkle:version>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <pubDate>Thu, 01 Jan 2026 00:00:00 +0000</pubDate>
+      <enclosure url="https://example.invalid/Roamux-99.0.0.zip"
+                 length="900"
+                 type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>

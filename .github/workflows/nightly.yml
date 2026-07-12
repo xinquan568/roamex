@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Roamex nightly (roam-5 / §12.6): the full build + full suite once a capable runner exists
+# Roamux nightly (roam-5 / §12.6): the full build + full suite once a capable runner exists
 # (roam-36); until then the hermetic slice runs and the Chromium half skips VISIBLY.
 name: nightly
 on:
@@ -14,15 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Hermetic suite (always runs)
-        run: python3 -m unittest discover -s roamex/build/tests -v
+        run: python3 -m unittest discover -s roamux/build/tests -v
 
   nightly-selfhosted:
-    # ROAMEX_CHROMIUM_DEPENDENT: the nightly warm-base build + full Roamex suites (roam-36, §12.6).
+    # ROAMUX_CHROMIUM_DEPENDENT: the nightly warm-base build + full Roamux suites (roam-36, §12.6).
     # Arms enumerated exactly: the schedule (runs on the default branch) or a main-only manual
     # dispatch. No non-PR catch-all.
     if: ${{ vars.ROAMEX_CI_CHROMIUM_RUNNER != '' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) }}
     runs-on: [self-hosted, macos, chromium-builder]
     steps:
       - uses: actions/checkout@v4
-      - name: Nightly warm-base build + Roamex suites
-        run: bash roamex/build/ci/tier2_job.sh
+      - name: Nightly warm-base build + Roamux suites
+        run: bash roamux/build/ci/tier2_job.sh

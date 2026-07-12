@@ -1,0 +1,95 @@
+--- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
++++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+@@ -63,6 +63,7 @@
+ #include "components/security_interstitials/content/known_interception_disclosure_ui.h"
+ #include "components/webui/user_actions/user_actions_ui.h"
+ #include "content/public/browser/webui_config_map.h"
++#include "roamux/browser/ui/webui/about/roamux_about_ui.h"
+ #include "extensions/buildflags/buildflags.h"
+ #include "printing/buildflags/buildflags.h"
+ #include "ui/webui/buildflags.h"
+@@ -243,6 +244,7 @@
+ 
+   auto& map = content::WebUIConfigMap::GetInstance();
+   map.AddWebUIConfig(std::make_unique<AccessibilityUIConfig>());
++  map.AddWebUIConfig(std::make_unique<roamux::RoamuxAboutUIConfig>());
+   map.AddWebUIConfig(
+       std::make_unique<AccessibilityAnnotatorInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<AutofillInternalsUIConfig>());
+--- a/chrome/browser/resources/BUILD.gn
++++ b/chrome/browser/resources/BUILD.gn
+@@ -300,6 +300,7 @@
+   public_deps = [
+     "accessibility:resources",
+     "accessibility_annotator_internals:resources",
++    "//roamux/app/resources/about:resources",
+     "actor_internals:resources",
+     "bluetooth_internals:resources",
+     "browsing_topics:resources",
+@@ -379,6 +380,7 @@
+ 
+   sources = [
+     "$root_gen_dir/chrome/accessibility_annotator_internals_resources.pak",
++    "$root_gen_dir/chrome/roamux_about_resources.pak",
+     "$root_gen_dir/chrome/accessibility_resources.pak",
+     "$root_gen_dir/chrome/actor_internals_resources.pak",
+     "$root_gen_dir/chrome/bluetooth_internals_resources.pak",
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -385,6 +385,7 @@
+     "//chrome/browser/profiles:profile_util",
+     "//chrome/browser/profiles:profile_util_impl",
+     "//roamux/browser/ui/tabs",
++    "//roamux/browser/ui/webui/about",
+     "//chrome/browser/profiling_host",
+     "//chrome/browser/renderer_host",
+     "//chrome/browser/resources",
+--- a/tools/gritsettings/resource_ids.spec
++++ b/tools/gritsettings/resource_ids.spec
+@@ -215,6 +215,10 @@
+   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/app_home/resources.grd": {
+     "META": {"sizes": {"includes": [20]}},
+     "includes": [2760],
++  },
++  "<(SHARED_INTERMEDIATE_DIR)/roamux/app/resources/about/resources.grd": {
++    "META": {"sizes": {"includes": [10],}},
++    "includes": [2770],
+   },
+   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/app_service_internals/resources.grd": {
+     "META": {"sizes": {"includes": [5],}},
+--- a/third_party/lit/v3_0/BUILD.gn
++++ b/third_party/lit/v3_0/BUILD.gn
+@@ -28,6 +28,7 @@
+     "//chrome/browser/resources/access_code_cast:build_ts",
+     "//chrome/browser/resources/accessibility_annotator_info:build_ts",
+     "//chrome/browser/resources/accessibility_annotator_internals:build_ts",
++    "//roamux/app/resources/about:build_ts",
+     "//chrome/browser/resources/actor_overlay:build_ts",
+     "//chrome/browser/resources/ai_overlay_dialog:build_ts",
+     "//chrome/browser/resources/app_home:build_ts",
+--- a/chrome/test/data/webui/BUILD.gn
++++ b/chrome/test/data/webui/BUILD.gn
+@@ -82,6 +82,7 @@
+       "new_tab_shared/new_tab_shared_browsertest.cc",
+       "omnibox_popup/omnibox_popup_browsertest.cc",
+       "optimization_guide_internals/optimization_guide_internals_browsertest.cc",
++      "//roamux/app/resources/about/test/roamux_about_browsertest.cc",
+       "password_manager/password_manager_browsertest.cc",
+       "password_manager_internals/password_manager_internals_browsertest.cc",
+       "privacy_sandbox/internals/privacy_sandbox_internals_browsertest.cc",
+@@ -602,6 +603,7 @@
+       "new_tab_shared:build_grdp",
+       "omnibox_popup:build_grdp",
+       "optimization_guide_internals:build_grdp",
++      "//roamux/app/resources/about/test:build_grdp",
+       "password_manager:build_grdp",
+       "password_manager_internals:build_grdp",
+       "privacy_sandbox/internals:build_grdp",
+@@ -665,6 +667,7 @@
+       "$target_gen_dir/new_tab_page/resources.grdp",
+       "$target_gen_dir/omnibox_popup/resources.grdp",
+       "$target_gen_dir/optimization_guide_internals/resources.grdp",
++      "$root_gen_dir/roamux/app/resources/about/test/resources.grdp",
+       "$target_gen_dir/password_manager/resources.grdp",
+       "$target_gen_dir/password_manager_internals/resources.grdp",
+       "$target_gen_dir/privacy_sandbox/internals/resources.grdp",

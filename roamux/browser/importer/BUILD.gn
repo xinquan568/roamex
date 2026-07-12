@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+# roam-16: the browser-side Edge secret decryptor (Keychain read + Edge decrypt
+# in one process; only plaintext leaves).
+source_set("importer") {
+  sources = [
+    "edge_import_adapter.cc",
+    "edge_import_adapter.h",
+    "edge_import_preflight.cc",
+    "edge_import_preflight.h",
+    "edge_import_report.cc",
+    "edge_import_report.h",
+    "edge_import_types.h",
+    "edge_indexed_db_reader.cc",
+    "edge_indexed_db_reader.h",
+    "edge_local_storage_reader.cc",
+    "edge_local_storage_reader.h",
+    "edge_secret_decryptor.h",
+    "edge_secret_decryptor.mm",
+    "roamux_edge_import_coordinator.cc",
+    "roamux_edge_import_coordinator.h",
+    "roamux_edge_import_driver.cc",
+    "roamux_edge_import_driver.h",
+    "roamux_indexed_db_import_stage.cc",
+    "roamux_indexed_db_import_stage.h",
+    "roamux_origin_storage_import_stage.cc",
+    "roamux_origin_storage_import_stage.h",
+    "roamux_secret_import_stage.h",
+    "roamux_secret_import_stage.mm",
+  ]
+  deps = [
+    "//base",
+    "//chrome/browser/importer:impl",
+    "//chrome/browser/profiles:profile",
+    "//components/password_manager/core/browser:password_form",
+    "//components/services/storage/public/mojom",
+    "//components/user_data_importer/common",
+    "//content/public/browser",
+    "//crypto",
+    "//net",
+    "//roamux/common",
+    "//roamux/common:crypto_passkey",
+    "//sql",
+    "//url",
+  ]
+}

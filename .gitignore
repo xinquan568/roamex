@@ -4,9 +4,9 @@
 *.pyc
 __pycache__/
 .DS_Store
-# distributor-provided Google API keys (see roamex/build/google_keys.gni.template)
-/roamex/build/google_keys.gni
+# distributor-provided Google API keys (see roamux/build/google_keys.gni.template)
+/roamux/build/google_keys.gni
 
-# Roamex (roam-32): vendored Sparkle — fetched by roamex/build/fetch_sparkle.py (pin+hash), never committed.
-roamex/third_party/sparkle/*
-!roamex/third_party/sparkle/README.md
+# Roamux (roam-32): vendored Sparkle — fetched by roamux/build/fetch_sparkle.py (pin+hash), never committed.
+roamux/third_party/sparkle/*
+!roamux/third_party/sparkle/README.md

@@ -1,0 +1,136 @@
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -47,6 +47,7 @@
+   import("//build/config/apple/symbols.gni")
+   import("//build/config/mac/mac_sdk.gni")
+   import("//build/config/mac/rules.gni")
++import("//roamux/build/buildflags.gni")
+   import("//build/util/branding.gni")
+   import("//chrome/browser/buildflags.gni")
+   import("//chrome/updater/branding.gni")
+@@ -490,8 +491,13 @@
+     }
+   }
+ 
++  # Roamux (roam-32): merge Sparkle keys into the app plist when the flag is on.
++  _roamux_app_plists = [ "app/app-Info.plist" ]
++  if (roamux_enable_sparkle) {
++    _roamux_app_plists += [ "//roamux/app/sparkle-Info.plist" ]
++  }
+   tweak_info_plist("chrome_app_plist") {
+-    info_plist = "app/app-Info.plist"
++    info_plists = _roamux_app_plists
+     args = [
+       "--breakpad=0",
+       "--scm=1",
+@@ -527,6 +533,8 @@
+     configs += [ "//build/config/compiler:wexit_time_destructors" ]
+ 
+     deps = [
++      # Roamux (roam-32): copy Sparkle.framework into Contents/Frameworks.
++      "//roamux/app",
+       ":chrome_app_strings_bundle_data",
+       ":chrome_resources",
+       ":chrome_versioned_bundle_data",
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -9,6 +9,7 @@
+ import("//build/config/chromebox_for_meetings/buildflags.gni")
+ import("//build/config/compiler/pgo/pgo.gni")
+ import("//build/config/features.gni")
++import("//roamux/build/buildflags.gni")
+ import("//build/config/python.gni")
+ import("//build/config/ui.gni")
+ import("//chrome/browser/buildflags.gni")
+@@ -649,6 +650,7 @@
+   ]
+ 
+   deps = [
++    "//roamux/app:app_buildflags",
+     "//roamux/common",
+     ":active_use_util",
+     ":browser_features",
+@@ -1657,6 +1659,13 @@
+     "//chrome/browser/ui/webauthn:impl",
+   ]
+ 
++  # Roamux (roam-32): app_controller_mac.mm calls the Sparkle updater on
++  # flag-on builds; pull its definitions (the buildflag header alone is not
++  # enough to link).
++  if (roamux_enable_sparkle) {
++    deps += [ "//roamux/app:sparkle_updater" ]
++  }
++
+   if (enable_webui_ntp) {
+     deps += [
+       "//chrome/browser/new_tab_page",
+--- a/chrome/browser/app_controller_mac.mm
++++ b/chrome/browser/app_controller_mac.mm
+@@ -3,6 +3,11 @@
+ // found in the LICENSE file.
+ 
+ #import "chrome/browser/app_controller_mac.h"
++
++#include "roamux/app/app_buildflags.h"
++#if BUILDFLAG(ROAMUX_ENABLE_SPARKLE)
++#include "roamux/app/roamux_sparkle_updater.h"
++#endif
+ 
+ #include <AppKit/AppKit.h>
+ #include <dispatch/dispatch.h>
+@@ -1252,7 +1257,19 @@
+ 
+ // This is called after profiles have been loaded and preferences registered.
+ // It is safe to access the default profile here.
++#if BUILDFLAG(ROAMUX_ENABLE_SPARKLE)
++// Roamux (roam-32): the "Check for Updates…" menu action.
++- (void)roamuxCheckForUpdates:(id)sender {
++  roamux::app::CheckForUpdates();
++}
++#endif
++
+ - (void)applicationDidFinishLaunching:(NSNotification*)notify {
++#if BUILDFLAG(ROAMUX_ENABLE_SPARKLE)
++  // Roamux (roam-32): start the Sparkle updater (scheduled checks per the
++  // Info.plist keys merged into the bundle).
++  roamux::app::InitSparkleUpdater();
++#endif
+   if (g_browser_process->browser_policy_connector()
+           ->chrome_browser_cloud_management_controller()
+           ->IsEnterpriseStartupDialogShowing()) {
+--- a/chrome/browser/ui/cocoa/BUILD.gn
++++ b/chrome/browser/ui/cocoa/BUILD.gn
+@@ -127,6 +127,9 @@
+ 
+   public_deps = [ "//chrome/browser:browser_public_dependencies" ]
+ 
++  # Roamux (roam-32): the ROAMUX_ENABLE_SPARKLE buildflag for the menu item.
++  deps = [ "//roamux/app:app_buildflags" ]
++
+   deps += [
+     "//chrome/app:command_ids",
+     "//chrome/app/theme:chrome_unscaled_resources_grit",
+--- a/chrome/browser/ui/cocoa/main_menu_builder.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
+@@ -4,6 +4,8 @@
+ 
+ #import "chrome/browser/ui/cocoa/main_menu_builder.h"
+ 
++#include "roamux/app/app_buildflags.h"
++
+ #include "base/feature_list.h"
+ #include "base/i18n/rtl.h"
+ #include "base/mac/mac_util.h"
+@@ -61,6 +63,12 @@
+                   .tag(IDC_ABOUT)
+                   .target(app_delegate)
+                   .action(@selector(orderFrontStandardAboutPanel:)),
++#if BUILDFLAG(ROAMUX_ENABLE_SPARKLE)
++              // Roamux (roam-32): Sparkle "Check for Updates…".
++              Item(IDS_COMPONENTS_CHECK_FOR_UPDATE)
++                  .target(app_delegate)
++                  .action(@selector(roamuxCheckForUpdates:)),
++#endif
+               Item().is_separator(),
+               Item(IDS_PREFERENCES)
+                   .tag(IDC_OPTIONS)

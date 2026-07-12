@@ -35,21 +35,21 @@ snapshots (`tart`/Anka). Adopt these the moment this stops being a single-operat
 
 ```sh
 # Provision (idempotent; --dry-run to preview):
-bash roamex/build/ci/provision_runner.sh
+bash roamux/build/ci/provision_runner.sh
 # Machine-specific env for jobs (written once):
-cat > ~/roamex-runner/.env <<ENV
+cat > ~/roamux-runner/.env <<ENV
 ROAMEX_CHROMIUM_SRC=<abs path to the pinned checkout, e.g. /Users/you/chromium/src>
 ROAMEX_DEPOT_TOOLS=<abs path to depot_tools>
-ROAMEX_CANONICAL_OVERLAY=<abs path to codes/roamex/roamex — the symlink restore target>
+ROAMEX_CANONICAL_OVERLAY=<abs path to codes/roamux/roamux — the symlink restore target>
 ENV
 # Start (session-lifetime; dies on reboot):
-cd ~/roamex-runner && nohup ./run.sh >runner.log 2>&1 &
+cd ~/roamux-runner && nohup ./run.sh >runner.log 2>&1 &
 # Persist across reboots (deeper machine mutation — operator choice):
-cd ~/roamex-runner && ./svc.sh install && ./svc.sh start
+cd ~/roamux-runner && ./svc.sh install && ./svc.sh start
 # Enable tier-2 jobs:
-gh variable set ROAMEX_CI_CHROMIUM_RUNNER --body roamex-builder-1 --repo <owner>/<repo>
+gh variable set ROAMEX_CI_CHROMIUM_RUNNER --body roamux-builder-1 --repo <owner>/<repo>
 # Decommission (do BOTH — a set variable with a dead runner queues jobs until timeout):
-cd ~/roamex-runner && ./config.sh remove --token "$(gh api -X POST repos/<o>/<r>/actions/runners/remove-token --jq .token)"
+cd ~/roamux-runner && ./config.sh remove --token "$(gh api -X POST repos/<o>/<r>/actions/runners/remove-token --jq .token)"
 gh variable delete ROAMEX_CI_CHROMIUM_RUNNER --repo <owner>/<repo>
 ```
 

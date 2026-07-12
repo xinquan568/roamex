@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+import("//build/config/features.gni")
+
+# The pure macOS Chromium-Edge profile reader (roam-15 / I-3.1). No Importer
+# dependency, so roamux_unittests links it directly for the fidelity test; the
+# utility-process RoamuxEdgeImporter glue depends on it.
+# NOTE: roamux_edge_importer.{h,cc} is NOT in this target — it needs Importer
+# (out-of-line in //chrome/utility:utility) so it is a chrome/utility is_mac
+# source (patch 0013). This target is the pure reader only.
+source_set("importer") {
+  sources = [
+    "edge_profile_reader.cc",
+    "edge_profile_reader.h",
+  ]
+  deps = [
+    "//base",
+    "//chrome/common/importer:importer",
+    "//components/user_data_importer/common",
+    "//sql",
+    "//url",
+  ]
+}

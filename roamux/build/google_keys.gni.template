@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# TEMPLATE — copy to google_keys.gni (gitignored) ONLY on a distributor build that holds BOTH
+# Google API keys AND Google authorization (plan §7.3 state 3 "keyed-and-authorized"; §12.3).
+# Keys alone do NOT enable sign-in/sync — Chromium restricts them to authorized builds. Keyless or
+# keyed-but-unauthorized builds render the optional sign-in entry point inert-with-explanation.
+#
+# google_api_key = "<your key>"
+# google_default_client_id = "<your client id>"
+# google_default_client_secret = "<your client secret>"
+# roamux_signin_authorized_build = true   # assert the distributor's Google authorization

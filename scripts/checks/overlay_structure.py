@@ -5,12 +5,12 @@ cannot know the whole §12.2 hook inventory, so this enforces cheap shape rules;
 gate and the reviewer are the deeper enforcement. Hook + CI both call it.
 
 Rules:
-  (1) files under roamex/patches/ match NNNN-slug.patch (or are README.md);
-  (2) a Roamex-authored file (carrying our SPDX) must live under a declared Roamex area
-      (roamex/, scripts/, .github/, docs/, or top-level) — NOT at an upstream-Chromium mirror path
-      (chrome/, content/, base/, ui/, components/, ...) outside roamex/chromium_src/. That mirror-path
+  (1) files under roamux/patches/ match NNNN-slug.patch (or are README.md);
+  (2) a Roamux-authored file (carrying our SPDX) must live under a declared Roamux area
+      (roamux/, scripts/, .github/, docs/, or top-level) — NOT at an upstream-Chromium mirror path
+      (chrome/, content/, base/, ui/, components/, ...) outside roamux/chromium_src/. That mirror-path
       shape is how an undeclared in-tree upstream edit would masquerade as ours; such a file belongs in
-      roamex/chromium_src/ (an override) instead.
+      roamux/chromium_src/ (an override) instead.
 """
 
 import pathlib
@@ -38,18 +38,18 @@ def main(argv):
     for path in argv:
         p = path.replace("\\", "/")
         # (1) patch-name shape
-        if "/roamex/patches/" in p or p.startswith("roamex/patches/"):
+        if "/roamux/patches/" in p or p.startswith("roamux/patches/"):
             name = pathlib.PurePath(p).name
             if not (name == "README.md" or name.startswith(".") or PATCH_RE.match(name)):
                 violations.append(f"{path}: patch name must match NNNN-slug.patch")
-        # (2) upstream-path masquerade: a Roamex-authored (our-SPDX) file at an upstream mirror path
-        # that is NOT under roamex/chromium_src/ is an undeclared in-tree upstream edit.
+        # (2) upstream-path masquerade: a Roamux-authored (our-SPDX) file at an upstream mirror path
+        # that is NOT under roamux/chromium_src/ is an undeclared in-tree upstream edit.
         first = pathlib.PurePath(p).parts[0] if pathlib.PurePath(p).parts else ""
-        if (first in UPSTREAM_ROOT_NAMES and "roamex/chromium_src/" not in p
+        if (first in UPSTREAM_ROOT_NAMES and "roamux/chromium_src/" not in p
                 and _carries_our_spdx(path)):
             violations.append(
-                f"{path}: Roamex-authored file at an upstream mirror path — put overrides under "
-                f"roamex/chromium_src/ or additive code under roamex/ (§12.2)")
+                f"{path}: Roamux-authored file at an upstream mirror path — put overrides under "
+                f"roamux/chromium_src/ or additive code under roamux/ (§12.2)")
     for v in violations:
         print(f"overlay-structure: {v}", file=sys.stderr)
     return 1 if violations else 0

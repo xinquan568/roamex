@@ -1,0 +1,59 @@
+--- a/chrome/common/chrome_content_client.cc
++++ b/chrome/common/chrome_content_client.cc
+@@ -203,6 +203,10 @@
+ void ChromeContentClient::AddAdditionalSchemes(Schemes* schemes) {
+   for (auto* standard_scheme : kChromeStandardURLSchemes)
+     schemes->standard_schemes.push_back(standard_scheme);
++
++  // ROAMUX(roam-91): the product scheme alias ("roamux://about" et al.) —
++  // parse-only registration; the rewrite lives in //roamux/browser/scheme.
++  schemes->standard_schemes.push_back("roamux");
+ 
+ #if BUILDFLAG(IS_ANDROID)
+   schemes->referrer_schemes.push_back(content::kAndroidAppScheme);
+--- a/chrome/browser/profiles/profile_io_data.cc
++++ b/chrome/browser/profiles/profile_io_data.cc
+@@ -56,6 +56,10 @@
+       url::kBlobScheme,
+       url::kFileSystemScheme,
+       chrome::kChromeSearchScheme,
++      // ROAMUX(roam-91): browser-handled → renderers can't request roamux://
++      // (CanRequestURL tail) and unrewritten roamux:// URLs are dropped
++      // instead of reaching the OS external-protocol path.
++      "roamux",
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+     BUILDFLAG(IS_CHROMEOS)
+       webapps::kIsolatedAppScheme,
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -60,6 +60,8 @@
+ #include "chrome/browser/bluetooth/chrome_bluetooth_delegate_impl_client.h"
+ #include "chrome/browser/browser_about_handler.h"
+ #include "chrome/browser/browser_features.h"
++// ROAMUX(roam-91): roamux:// scheme alias rewriter.
++#include "roamux/browser/scheme/roamux_scheme_rewrite.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.h"
+ #include "chrome/browser/browsing_data/chrome_browsing_data_remover_constants.h"
+@@ -5129,6 +5131,11 @@
+     part->BrowserURLHandlerCreated(handler);
+   }
+ 
++  // ROAMUX(roam-91): roamux://about|flags → chrome:// alias (flag-gated in
++  // the handler body; rewrite-then-return-false chaining idiom).
++  handler->AddHandlerPair(&roamux::MaybeRewriteRoamuxAliasURL,
++                          BrowserURLHandler::null_handler());
++
+   // Handler to rewrite chrome://about and chrome://sync URLs.
+   handler->AddHandlerPair(&HandleChromeAboutAndChromeSyncRewrite,
+                           BrowserURLHandler::null_handler());
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -651,6 +651,7 @@
+ 
+   deps = [
+     "//roamux/app:app_buildflags",
++    "//roamux/browser/scheme",
+     "//roamux/common",
+     ":active_use_util",
+     ":browser_features",

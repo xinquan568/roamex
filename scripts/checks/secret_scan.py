@@ -20,8 +20,8 @@ ALLOWLIST = ("EXAMPLE", "<your", "your-", "placeholder", "REPLACE", "dummy", "fa
 # An explicit, review-visible per-line opt-out — HONORED ONLY in approved suppression paths (test
 # fixtures + *.template), so a normal source/config change cannot silence detection and slip a real
 # credential past CI. Same idea as detect-secrets' pragma / bandit's nosec, but path-scoped.
-ALLOW_MARKER = "roamex:allow-secret"
-SUPPRESSIBLE_DIRS = ("roamex/build/tests/", "/tests/")  # a real tests directory
+ALLOW_MARKER = "roamux:allow-secret"
+SUPPRESSIBLE_DIRS = ("roamux/build/tests/", "/tests/")  # a real tests directory
 SUPPRESSIBLE_SUFFIXES = (".template",)
 
 

@@ -24,8 +24,8 @@ fail() { echo "issue-link: $1" >&2; exit 1; }
 # rejects near-misses — branch requires a trailing "-<slug>"; title requires a terminal "(roam-N)";
 # body requires a whole-word "Closes" and no trailing alnum after the number (so "Closes #12x" and
 # "Encloses #12" are rejected).
-extract() { printf '%s' "$2" | ROAMEX_RE="$1" python3 -c \
-  'import os,re,sys; m=re.search(os.environ["ROAMEX_RE"], sys.stdin.read()); sys.stdout.write(m.group(1) if m else "")'; }
+extract() { printf '%s' "$2" | ROAMUX_RE="$1" python3 -c \
+  'import os,re,sys; m=re.search(os.environ["ROAMUX_RE"], sys.stdin.read()); sys.stdout.write(m.group(1) if m else "")'; }
 bn=$(extract '(?:^|/)roam-([0-9]+)-' "$BRANCH")
 tn=$(extract '\(roam-([0-9]+)\)\s*$' "$TITLE")
 bd=$(extract '(?i)(?:^|[^0-9A-Za-z])closes[ ]+#([0-9]+)(?![0-9A-Za-z])' "$BODY")

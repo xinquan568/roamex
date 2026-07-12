@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+# Additive //roamux/common — shared helpers (features, prefs). No upstream edit (plan §12.2).
+
+source_set("common") {
+  sources = [
+    "roamux_features.cc",
+    "roamux_features.h",
+    "roamux_prefs.cc",
+    "roamux_prefs.h",
+    "roamux_switches.h",
+    "roamux_url_constants.h",
+    "tab_strip_placement.cc",
+    "tab_strip_placement.h",
+  ]
+  deps = [
+    "//base",
+    "//components/prefs",
+    "//ui/gfx/geometry",
+  ]
+}
+
+# roam-16: the crypto passkey seam (friended in crypto/subtle_passkey.h by 0014).
+source_set("crypto_passkey") {
+  sources = [
+    "roamux_crypto_passkey.cc",
+    "roamux_crypto_passkey.h",
+  ]
+  deps = [ "//crypto" ]
+}

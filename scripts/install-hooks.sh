@@ -5,4 +5,4 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 chmod +x .githooks/* scripts/checks/*.py
 git config core.hooksPath .githooks
-echo "Roamex hooks active (core.hooksPath=.githooks): pre-commit, commit-msg, pre-push."
+echo "Roamux hooks active (core.hooksPath=.githooks): pre-commit, commit-msg, pre-push."

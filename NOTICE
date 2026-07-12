@@ -1,9 +1,9 @@
-Roamex
-Copyright 2026 The Roamex Authors
+Roamux
+Copyright 2026 The Roamux Authors
 
-This product includes software developed as part of the Roamex project
+This product includes software developed as part of the Roamux project
 (https://github.com/xinquan568/roamex), licensed under the Apache License, Version 2.0.
 
-Roamex is built as an overlay on Chromium (https://www.chromium.org/), which is licensed separately
+Roamux is built as an overlay on Chromium (https://www.chromium.org/), which is licensed separately
 under its own BSD-style license (see the Chromium checkout's LICENSE). The Chromium source is not
 distributed in this repository.

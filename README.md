@@ -1,6 +1,6 @@
-# Roamex
+# Roamux
 
-A personal-use desktop browser for **macOS**, built as a **Chromium/C++ overlay** (`src/roamex` over
+A personal-use desktop browser for **macOS**, built as a **Chromium/C++ overlay** (`src/roamux` over
 upstream Chromium). Apache-2.0. Four features + Brave-style profiles:
 
 1. Configurable tab-strip position (top / bottom / left / right)
@@ -12,18 +12,18 @@ upstream Chromium). Apache-2.0. Four features + Brave-style profiles:
 
 ## Build
 
-Roamex is a Chromium overlay — the Chromium source is **not** committed here; it's fetched with
+Roamux is a Chromium overlay — the Chromium source is **not** committed here; it's fetched with
 `depot_tools`. See **[`BOOTSTRAP.md`](BOOTSTRAP.md)** for prerequisites (≥ ~150 GB free disk, Xcode) and
 the fetch → overlay → `gn gen` → `autoninja` flow.
 
 The full feature proposal & execution plan lives in the parent workspace at
-`docs/discussion/2026-07-05-roamex-browser-features/` (see §7.9 governance, §11–§12 build/overlay, §14
+`docs/discussion/2026-07-05-roamux-browser-features/` (see §7.9 governance, §11–§12 build/overlay, §14
 issue breakdown). Work is tracked as GitHub issues **roam-1 … roam-40** (epics E0–E7).
 
 ## Layout
 
 ```
-roamex/            the overlay (placed at src/roamex/ at build time)
+roamux/            the overlay (placed at src/roamux/ at build time)
   browser/         net-new browser code (tabs UI, tab-visit, importer, sign-in)
   common/          shared helpers (features, prefs)
   chromium_src/    upstream overrides (§12.2 — used sparingly)

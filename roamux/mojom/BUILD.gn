@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Additive //roamux/mojom — the first Roamux mojom surface (roam-85).
+
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("mojom") {
+  sources = [ "update_page.mojom" ]
+
+  # roam-37: emit WebUI TypeScript bindings (update_page.mojom-webui.ts) for the
+  # chrome://roamux-about page. Page-local module path.
+  webui_module_path = "/"
+}

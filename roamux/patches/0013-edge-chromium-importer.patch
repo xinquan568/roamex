@@ -1,0 +1,267 @@
+diff --git a/chrome/browser/importer/BUILD.gn b/chrome/browser/importer/BUILD.gn
+index dd2bc68e39..8da07ed5c7 100644
+--- a/chrome/browser/importer/BUILD.gn
++++ b/chrome/browser/importer/BUILD.gn
+@@ -22,6 +22,8 @@ source_set("importer") {
+     "//chrome/app:generated_resources",
+     "//chrome/common/importer",
+     "//chrome/common/importer:interfaces",
++    "//roamux/common",
++    "//roamux/utility/importer",
+     "//components/bookmarks/browser",
+     "//components/favicon_base",
+     "//components/history/core/browser",
+@@ -58,6 +60,8 @@ source_set("impl") {
+     "//chrome/browser/search_engines",
+     "//chrome/browser/webdata_services",
+     "//chrome/common/importer:interfaces",
++    "//roamux/common",
++    "//roamux/utility/importer",
+     "//components/bookmarks/browser",
+     "//components/bookmarks/common",
+     "//components/favicon/core",
+@@ -112,6 +116,9 @@ source_set("unit_tests") {
+   sources = [
+     "firefox_profile_lock_unittest.cc",
+     "profile_writer_unittest.cc",
++    # Roamux (roam-15): the Edge reader -> ProfileWriter -> BookmarkModel
++    # tree-fidelity integration test (links ProfileWriter + BookmarkModel here).
++    "//roamux/test/roamux_edge_bookmarks_integration_unittest.cc",
+   ]
+ 
+   deps = [
+@@ -135,6 +142,7 @@ source_set("unit_tests") {
+     "//components/query_parser",
+     "//components/user_data_importer/common",
+     "//content/test:test_support",
++    "//roamux/utility/importer",
+     "//testing/gtest",
+   ]
+ }
+diff --git a/chrome/browser/importer/importer_list.cc b/chrome/browser/importer/importer_list.cc
+index 62546b572b..db87348e43 100644
+--- a/chrome/browser/importer/importer_list.cc
++++ b/chrome/browser/importer/importer_list.cc
+@@ -21,6 +21,13 @@
+ #if BUILDFLAG(IS_MAC)
+ #include "base/apple/foundation_util.h"
+ #include "chrome/common/importer/safari_importer_utils.h"
++#include "base/base_paths.h"
++#include "base/files/file_path.h"
++#include "base/files/file_util.h"
++#include "base/feature_list.h"
++#include "base/path_service.h"
++#include "roamux/common/roamux_features.h"
++#include "roamux/utility/importer/edge_profile_reader.h"
+ #endif
+ 
+ #if BUILDFLAG(IS_WIN)
+@@ -72,6 +79,25 @@ void DetectBuiltinWindowsProfiles(
+ #endif  // BUILDFLAG(IS_WIN)
+ 
+ #if BUILDFLAG(IS_MAC)
++// Roamux (roam-15): flag-gated detection of a macOS Chromium-Edge profile.
++// The Application-Support root comes from DIR_APP_DATA so tests can override it
++// hermetically (ScopedPathOverride). Advertises only the NON-SECRET items;
++// passwords/cookies are roam-16.
++void DetectRoamuxEdgeProfiles(
++    std::vector<user_data_importer::SourceProfile>* profiles) {
++  if (!base::FeatureList::IsEnabled(roamux::features::kEdgeImport)) {
++    return;
++  }
++  base::FilePath app_data;
++  if (!base::PathService::Get(base::DIR_APP_DATA, &app_data)) {
++    return;
++  }
++  if (std::optional<user_data_importer::SourceProfile> edge =
++          roamux::DetectEdgeSourceProfile(app_data)) {
++    profiles->push_back(std::move(*edge));
++  }
++}
++
+ void DetectSafariProfiles(
+     std::vector<user_data_importer::SourceProfile>* profiles) {
+   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
+@@ -183,6 +209,7 @@ std::vector<user_data_importer::SourceProfile> DetectSourceProfilesWorker(
+     DetectSafariProfiles(&profiles);
+     DetectFirefoxProfiles(locale, &profiles);
+   }
++  DetectRoamuxEdgeProfiles(&profiles);
+ #else
+   DetectFirefoxProfiles(locale, &profiles);
+ #endif
+diff --git a/chrome/browser/importer/importer_uma.cc b/chrome/browser/importer/importer_uma.cc
+index d50675a79e..00d9b29b72 100644
+--- a/chrome/browser/importer/importer_uma.cc
++++ b/chrome/browser/importer/importer_uma.cc
+@@ -25,6 +25,7 @@ enum ImporterTypeMetrics {
+ #if BUILDFLAG(IS_WIN)
+   IMPORTER_METRICS_EDGE = 7,
+ #endif
++  IMPORTER_METRICS_EDGE_CHROMIUM = 8,  // Roamux (roam-15). Never reorder.
+ 
+   // Insert new values here. Never remove any existing values, as this enum is
+   // used to bucket a UMA histogram, and removing values breaks that.
+@@ -59,6 +60,11 @@ void LogImporterUseToMetrics(const std::string& metric_postfix,
+     case user_data_importer::TYPE_BOOKMARKS_FILE:
+       metrics_type = IMPORTER_METRICS_BOOKMARKS_FILE;
+       break;
++#if BUILDFLAG(IS_MAC)
++    case user_data_importer::TYPE_EDGE_CHROMIUM:
++      metrics_type = IMPORTER_METRICS_EDGE_CHROMIUM;
++      break;
++#endif
+   }
+ 
+   // Note: This leaks memory, which is the expected behavior as the factory
+diff --git a/chrome/browser/importer/in_process_importer_bridge.cc b/chrome/browser/importer/in_process_importer_bridge.cc
+index 20e454416b..30925022a8 100644
+--- a/chrome/browser/importer/in_process_importer_bridge.cc
++++ b/chrome/browser/importer/in_process_importer_bridge.cc
+@@ -52,6 +52,10 @@ history::VisitSource ConvertImporterVisitSourceToHistoryVisitSource(
+       return history::SOURCE_IE_IMPORTED;
+     case user_data_importer::VISIT_SOURCE_SAFARI_IMPORTED:
+       return history::SOURCE_SAFARI_IMPORTED;
++    case user_data_importer::VISIT_SOURCE_EDGE_IMPORTED:
++      // Roamux (roam-15): a same-machine browser migration; the generic
++      // migration bucket (history has no browser-specific Edge source).
++      return history::SOURCE_OS_MIGRATION_IMPORTED;
+   }
+   NOTREACHED();
+ }
+diff --git a/chrome/common/importer/profile_import_process_param_traits_macros.h b/chrome/common/importer/profile_import_process_param_traits_macros.h
+index b19a5aa8ce..5685dbe298 100644
+--- a/chrome/common/importer/profile_import_process_param_traits_macros.h
++++ b/chrome/common/importer/profile_import_process_param_traits_macros.h
+@@ -23,11 +23,11 @@
+ #if BUILDFLAG(IS_WIN)
+ IPC_ENUM_TRAITS_MIN_MAX_VALUE(user_data_importer::ImporterType,
+                               user_data_importer::TYPE_UNKNOWN,
+-                              user_data_importer::TYPE_EDGE)
++                              user_data_importer::TYPE_EDGE_CHROMIUM)
+ #else
+ IPC_ENUM_TRAITS_MIN_MAX_VALUE(user_data_importer::ImporterType,
+                               user_data_importer::TYPE_UNKNOWN,
+-                              user_data_importer::TYPE_BOOKMARKS_FILE)
++                              user_data_importer::TYPE_EDGE_CHROMIUM)
+ #endif
+ 
+ IPC_ENUM_TRAITS_MIN_MAX_VALUE(user_data_importer::ImportItem,
+diff --git a/chrome/utility/BUILD.gn b/chrome/utility/BUILD.gn
+index 41a02f8a8a..6c2f73f7f0 100644
+--- a/chrome/utility/BUILD.gn
++++ b/chrome/utility/BUILD.gn
+@@ -112,7 +112,12 @@ static_library("utility") {
+       sources += [
+         "importer/safari_importer.h",
+         "importer/safari_importer.mm",
++        # Roamux (roam-15): the Chromium-Edge importer glue (needs Importer,
++        # owned only here); the pure reader is //roamux/utility/importer.
++        "//roamux/utility/importer/roamux_edge_importer.cc",
++        "//roamux/utility/importer/roamux_edge_importer.h",
+       ]
++      deps += [ "//roamux/utility/importer" ]
+     }
+     if (!is_mac && !is_chromeos) {
+       # NSS decryptor is not needed on ChromeOS. Additionally, it depends on
+@@ -268,7 +273,11 @@ if (!is_android) {
+       sources += [ "importer/firefox_importer_unittest.cc" ]
+     }
+     if (is_mac) {
+-      sources += [ "importer/safari_importer_unittest.mm" ]
++      sources += [
++        "importer/safari_importer_unittest.mm",
++        # Roamux (roam-15): the importer glue + creator + IPC integration test.
++        "//roamux/test/roamux_edge_importer_unittest.cc",
++      ]
+     }
+     if (is_win) {
+       sources += [ "importer/edge_database_reader_unittest_win.cc" ]
+@@ -279,7 +288,10 @@ if (!is_android) {
+       "//base",
+       "//chrome/common:constants",
+       "//chrome/common/importer",
++      "//chrome/common/importer:interfaces",
+       "//chrome/common/importer:test_support",
++      "//ipc",
++      "//roamux/utility/importer",
+       "//components/favicon_base",
+       "//components/user_data_importer/common",
+       "//components/user_data_importer/utility:safari_data_importer",
+diff --git a/chrome/utility/importer/importer_creator.cc b/chrome/utility/importer/importer_creator.cc
+index 5f8f27c70b..bdf29a877f 100644
+--- a/chrome/utility/importer/importer_creator.cc
++++ b/chrome/utility/importer/importer_creator.cc
+@@ -7,6 +7,9 @@
+ #include "base/notreached.h"
+ #include "build/build_config.h"
+ #include "chrome/utility/importer/bookmarks_file_importer.h"
++#if BUILDFLAG(IS_MAC)
++#include "roamux/utility/importer/roamux_edge_importer.h"
++#endif
+ #include "chrome/utility/importer/firefox_importer.h"
+ 
+ #if BUILDFLAG(IS_WIN)
+@@ -43,6 +46,9 @@ scoped_refptr<Importer> CreateImporterByType(
+ #if BUILDFLAG(IS_MAC)
+     case user_data_importer::TYPE_SAFARI:
+       return new SafariImporter(base::apple::GetUserLibraryPath());
++    // Roamux (roam-15): modern Chromium-Edge on macOS.
++    case user_data_importer::TYPE_EDGE_CHROMIUM:
++      return new roamux::RoamuxEdgeImporter();
+ #endif
+     default:
+       NOTREACHED();
+diff --git a/components/user_data_importer/common/importer_data_types.h b/components/user_data_importer/common/importer_data_types.h
+index 3cac91f8d5..5457feb971 100644
+--- a/components/user_data_importer/common/importer_data_types.h
++++ b/components/user_data_importer/common/importer_data_types.h
+@@ -111,6 +111,7 @@ enum VisitSource {
+   VISIT_SOURCE_FIREFOX_IMPORTED = 1,
+   VISIT_SOURCE_IE_IMPORTED = 2,
+   VISIT_SOURCE_SAFARI_IMPORTED = 3,
++  VISIT_SOURCE_EDGE_IMPORTED = 4,  // Roamux (roam-15).
+ };
+ 
+ }  // namespace user_data_importer
+diff --git a/components/user_data_importer/common/importer_type.h b/components/user_data_importer/common/importer_type.h
+index d4f7de8d9a..c66179499b 100644
+--- a/components/user_data_importer/common/importer_type.h
++++ b/components/user_data_importer/common/importer_type.h
+@@ -28,6 +28,10 @@ enum ImporterType {
+ #if BUILDFLAG(IS_WIN)
+   TYPE_EDGE = 6,
+ #endif
++  // Roamux (roam-15): modern Chromium-Edge on macOS (Chrome-format profile).
++  // Distinct from TYPE_EDGE (Windows Edge Legacy / ESE). Value is unconditional
++  // to keep the IPC ImporterType range contiguous across platforms.
++  TYPE_EDGE_CHROMIUM = 7,
+ };
+ 
+ }  // namespace user_data_importer
+diff --git a/tools/metrics/histograms/enums.xml b/tools/metrics/histograms/enums.xml
+index 26fb31be06..a472d2f262 100644
+--- a/tools/metrics/histograms/enums.xml
++++ b/tools/metrics/histograms/enums.xml
+@@ -5690,6 +5690,9 @@ Called by update_net_error_codes.py.-->
+     A bookmarks.html file
+   </int>
+   <int value="7" label="IMPORTER_METRICS_EDGE">Edge (Windows-only)</int>
++  <int value="8" label="IMPORTER_METRICS_EDGE_CHROMIUM">
++    Edge (Chromium, macOS)
++  </int>
+ </enum>
+ 
+ <enum name="InactiveFrameDisallowActivationReason">
+diff --git a/tools/metrics/histograms/metadata/sql/histograms.xml b/tools/metrics/histograms/metadata/sql/histograms.xml
+index d7a1188656..40c1722f11 100644
+--- a/tools/metrics/histograms/metadata/sql/histograms.xml
++++ b/tools/metrics/histograms/metadata/sql/histograms.xml
+@@ -83,6 +83,7 @@ chromium-metrics-reviews@google.com.
+   <variant name="Recovery" summary="Recovery"/>
+   <variant name="ReplayCapabilities" summary="ReplayCapabilities"/>
+   <variant name="ReportingAndNEL" summary="ReportingAndNEL"/>
++  <variant name="RoamuxEdgeImporter" summary="RoamuxEdgeImporter"/>
+   <variant name="ServerCertificate" summary="ServerCertificate"/>
+   <variant name="SessionStorage" summary="SessionStorage, on-disk"/>
+   <variant name="SessionStorageEphemeral" summary="SessionStorage, in-memory"/>

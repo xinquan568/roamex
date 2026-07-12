@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """pre-push test gate (roam-38, §7.9 / P6). Honest degradation: always runs the hermetic suite; when a
 Chromium checkout is configured (ROAMEX_CHROMIUM_SRC with an out/Default) it also builds+runs the touched
-Roamex gtest target. Never a silent pass; never a full-tree build.
+Roamux gtest target. Never a silent pass; never a full-tree build.
 """
 
 import os
@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-GTEST_TARGET = "roamex_unittests"
+GTEST_TARGET = "roamux_unittests"
 
 
 def _clean_git_env():
@@ -34,7 +34,7 @@ def gtest_decision(environ):
 
 def main():
     print("pre-push: running the hermetic suite (checkout-free)...")
-    rc = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "roamex/build/tests"],
+    rc = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "roamux/build/tests"],
                         cwd=REPO, env=_clean_git_env()).returncode
     if rc != 0:
         print("pre-push: hermetic suite FAILED — push blocked.", file=sys.stderr)

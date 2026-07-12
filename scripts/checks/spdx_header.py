@@ -3,7 +3,7 @@
 """SPDX Apache-2.0 header check (roam-38, §7.9). Single source of truth: the pre-commit hook and the
 CI governance job both invoke this over their file list.
 
-Required on the Roamex-authored code/build/CI/script set below. Exempt: roamex/chromium_src/** (upstream
+Required on the Roamux-authored code/build/CI/script set below. Exempt: roamux/chromium_src/** (upstream
 BSD copies), .md docs (prose is not license-headered), and no-comment data/legal files.
 """
 
@@ -16,7 +16,7 @@ MARKER = "SPDX-License-Identifier: Apache-2.0"
 
 def is_exempt(path):
     p = path.replace("\\", "/")
-    if "roamex/chromium_src/" in p or p.startswith("roamex/chromium_src/"):
+    if "roamux/chromium_src/" in p or p.startswith("roamux/chromium_src/"):
         return True
     return pathlib.PurePath(p).suffix not in REQUIRED_SUFFIXES
 

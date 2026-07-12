@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# roam-21 (I-4.1): the settled-visit journal service + its writable SQLite store.
+# The Profile-facing factory (settled_visit_journal_factory.*) is NOT listed here —
+# it needs //chrome/browser/profiles and is compiled into the upstream tab target
+# via patch 0015's `sources +=` (the two-piece pattern from roam-10 / patch 0009).
+source_set("tab_visit") {
+  sources = [
+    # roam-28 (I-4.8): the cross-layer Clear-Browsing-Data hook registry. Low
+    # (BrowserContext is forward-declared / pass-through only, no //content dep);
+    # the ui layer registers the impl and the browsing_data delegate invokes it.
+    "settled_visit_clear_hook.cc",
+    "settled_visit_clear_hook.h",
+    "settled_visit_journal_service.cc",
+    "settled_visit_journal_service.h",
+
+    # roam-24 (I-4.4): the pure derived-MRU + frozen-gesture Back/Forward
+    # traversal controller. Pure logic (//base only) — no Profile/UI/SQLite.
+    "tab_traversal_controller.cc",
+    "tab_traversal_controller.h",
+
+    # roam-23 (I-4.3): the pure, UI-free commit-decision predicate shared by the
+    # observer bridge (UI target) and its unit test. The bridge + its factory
+    # are Profile/UI-facing and are compiled into //chrome/browser/ui/tabs via
+    # patch 0016 (NOT listed here — keeping this source_set free of
+    # //chrome/browser/ui).
+    "tab_visit_activation_class.h",
+    "visit_url_filter.cc",
+    "visit_url_filter.h",
+    "visits_store.cc",
+    "visits_store.h",
+  ]
+  deps = [
+    "//base",
+    "//components/keyed_service/core",
+    "//roamux/common",
+    "//sql",
+    "//url",
+  ]
+}

@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: Apache-2.0
+// roam-85 (I-6.5): the update-page Mojo surface. roam-37's About WebUI hands
+// the service its UpdatePage remote + a handler receiver via the factory; the
+// service pushes UpdateSnapshot state changes and the page drives commands.
+module roamux.mojom;
+
+// Mirrors roamux::updates::UpdateStatus (parity asserted in a unit test).
+enum UpdateStatus {
+  kIdle,
+  kChecking,
+  kUpToDate,
+  kAvailable,
+  kDownloading,
+  kReadyToInstall,
+  kError,
+};
+
+struct UpdateSnapshot {
+  UpdateStatus status;
+  string version;
+  string date;
+  string notes;
+  string error;
+  double progress;  // 0..1 while downloading
+};
+
+// Commands the WebUI issues.
+interface UpdatePageHandler {
+  CheckForUpdates();
+  Download();
+  InstallAndRelaunch();
+  Skip(string version);
+};
+
+// State the service pushes to the WebUI.
+interface UpdatePage {
+  OnStateChanged(UpdateSnapshot snapshot);
+};
+
+// The WebUI bootstraps by handing its page remote + a handler receiver; the
+// service binds them and immediately pushes the current snapshot.
+interface UpdatePageHandlerFactory {
+  CreatePageHandler(pending_remote<UpdatePage> page,
+                    pending_receiver<UpdatePageHandler> handler);
+};

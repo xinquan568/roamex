@@ -1,0 +1,71 @@
+--- a/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
++++ b/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
+@@ -207,6 +207,10 @@
+ #include "roamux/browser/tab_visit/tab_visit_observer_bridge_factory.h"
+ #include "roamux/browser/tab_visit/tab_visit_traversal_coordinator_factory.h"
+ #include "roamux/browser/tabs/tab_uid_service_factory.h"
++#include "roamux/app/app_buildflags.h"
++#if BUILDFLAG(ROAMUX_ENABLE_SPARKLE)
++#include "roamux/browser/updates/roamux_update_service_factory.h"
++#endif
+ #include "chrome/browser/push_messaging/push_messaging_service_factory.h"
+ #include "chrome/browser/reading_list/reading_list_model_factory.h"
+ #include "chrome/browser/reduce_accept_language/reduce_accept_language_factory.h"
+@@ -660,6 +664,11 @@
+   roamux::tab_visit::TabVisitObserverBridgeFactory::GetInstance();
+   // Roamux (roam-25): eager per-profile tab-visit traversal coordinator.
+   roamux::tab_visit::TabVisitTraversalCoordinatorFactory::GetInstance();
++#if BUILDFLAG(ROAMUX_ENABLE_SPARKLE)
++  // Roamux (roam-85): the update service (per-profile facade over one
++  // process-wide Sparkle owner).
++  roamux::updates::RoamuxUpdateServiceFactory::GetInstance();
++#endif
+   // ---------------------------------------------------------------------------
+   // Redirect to those lists for factories that are part of those modules.
+   // Module specific registration functions:
+diff --git a/chrome/browser/profiles/BUILD.gn b/chrome/browser/profiles/BUILD.gn
+index b1d5797e32..9b930b4165 100644
+--- a/chrome/browser/profiles/BUILD.gn
++++ b/chrome/browser/profiles/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//roamux/build/buildflags.gni")
+ import("//build/config/chromeos/ui_mode.gni")
+ import("//chrome/common/features.gni")
+ import("//components/captive_portal/core/features.gni")
+@@ -597,6 +598,7 @@ source_set("profiles_extra_parts_impl") {
+   sources = [ "chrome_browser_main_extra_parts_profiles.cc" ]
+ 
+   deps = [
++    "//roamux/app:app_buildflags",
+     ":misc",
+     ":profile_manager",
+     ":profile_util",
+@@ -925,6 +927,25 @@ source_set("profiles_extra_parts_impl") {
+   if (enable_offline_pages) {
+     deps += [ "//chrome/browser/offline_pages" ]
+   }
++
++  if (roamux_enable_sparkle) {
++    # Roamux (roam-85): the update service/factory compiled into this target
++    # (has the profile deps); ObjC++ + Sparkle + the update mojom.
++    sources += [
++      "//roamux/browser/updates/roamux_update_service.h",
++      "//roamux/browser/updates/roamux_update_service.mm",
++      "//roamux/browser/updates/roamux_update_service_factory.cc",
++      "//roamux/browser/updates/roamux_update_service_factory.h",
++    ]
++    deps += [
++      "//mojo/public/cpp/bindings",
++      "//roamux/app:sparkle_updater",
++      "//roamux/browser/updates:update_state_machine",
++      "//roamux/mojom",
++    ]
++    configs += [ "//roamux/app:sparkle_link" ]
++    frameworks = [ "AppKit.framework" ]
++  }
+ }
+ 
+ source_set("profile_downloader") {

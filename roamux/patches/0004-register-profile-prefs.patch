@@ -1,0 +1,32 @@
+diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
+index 092d14266a..bb0b1e7092 100644
+--- a/chrome/browser/prefs/BUILD.gn
++++ b/chrome/browser/prefs/BUILD.gn
+@@ -58,6 +58,7 @@ source_set("impl") {
+   ]
+ 
+   deps = [
++    "//roamux/common",
+     ":prefs",
+     ":util",
+     "//chrome/browser:browser_process",
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+index 15f4e73527..2152c94864 100644
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -213,6 +213,7 @@
+ #include "pdf/buildflags.h"
+ #include "printing/buildflags/buildflags.h"
+ #include "rlz/buildflags/buildflags.h"
++#include "roamux/common/roamux_prefs.h"
+ #include "ui/webui/buildflags.h"
+ 
+ #if BUILDFLAG(ENABLE_WEBUI_NTP)
+@@ -1821,6 +1822,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+ #if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
+   safe_browsing::file_type::RegisterProfilePrefs(registry);
+ #endif
++  roamux::prefs::RegisterProfilePrefs(registry);
+   safe_browsing::RegisterProfilePrefs(registry);
+   safety_check::prefs::RegisterProfilePrefs(registry);
+   SearchPrefetchService::RegisterProfilePrefs(registry);

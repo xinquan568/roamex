@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+# Additive //roamux/browser/signin — the §12.3 build-state machinery (roam-4). E5 consumes this.
+
+import("//build/buildflag_header.gni")
+import("//roamux/build/buildflags.gni")
+
+buildflag_header("signin_buildflags") {
+  header = "signin_buildflags.h"
+  flags = [ "ROAMUX_SIGNIN_AUTHORIZED_BUILD=$roamux_signin_authorized_build" ]
+}
+
+source_set("signin") {
+  sources = [
+    "roamux_signin_build_state.cc",
+    "roamux_signin_build_state.h",
+    "signin_inert.cc",
+    "signin_inert.h",
+    "signin_surfaces.cc",
+    "signin_surfaces.h",
+  ]
+  public_deps = [ ":signin_buildflags" ]
+  deps = [
+    "//base",
+    "//components/prefs",
+    "//components/signin/public/base",
+    "//google_apis",
+    "//roamux/common",
+  ]
+}

@@ -1,0 +1,13 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 3f93d31fb7..8b73408e64 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -366,6 +366,8 @@ group("gn_all") {
+     if (is_mac) {
+       deps += [
+         "//chrome/installer/gcapi_mac:gcapi_example",
++        "//roamux",
++        "//roamux:roamux_tests",
+         "//tools/mac",
+       ]
+     }
