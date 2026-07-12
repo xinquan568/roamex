@@ -16,6 +16,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/test/base/in_process_browser_test.h"
+#include "roamux/test/support/roamux_browser_test.h"
 #include "components/services/storage/public/mojom/local_storage_control.mojom.h"
 #include "components/services/storage/public/mojom/storage_usage_info.mojom.h"
 #include "content/public/browser/storage_partition.h"
@@ -60,7 +61,7 @@ void WriteFixture(const base::FilePath& profile_dir,
       db->Put(leveldb::WriteOptions(), pkey, std::string("\x01z", 2)).ok());
 }
 
-using RoamuxOriginStorageImportTest = InProcessBrowserTest;
+using RoamuxOriginStorageImportTest = roamux::test::RoamuxBrowserTest;
 
 IN_PROC_BROWSER_TEST_F(RoamuxOriginStorageImportTest,
                        AuthCarrierSurvivesToDisk) {
