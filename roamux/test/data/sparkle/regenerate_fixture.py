@@ -154,7 +154,13 @@ def main():
         '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
         '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
         '<plist version="1.0"><dict>\n'
-        '  <key>CFBundleIdentifier</key><string>com.roamux.sparkle.testhost</string>\n'
+        # roam-94: the throwaway Sparkle test-host bundle id stays com.roamex —
+        # it is baked into the committed EdDSA-signed fixture (Roamux-99.0.0.zip)
+        # and this python reference signer cannot reproduce a Sparkle-C++-valid
+        # signature for a changed id. Functionally irrelevant test data (the
+        # suites validate the signature, not the id). A proper com.roamux
+        # re-sign with Sparkle's sign_update is deferred — see the tracking issue.
+        '  <key>CFBundleIdentifier</key><string>com.roamex.sparkle.testhost</string>\n'
         '  <key>CFBundleName</key><string>TestHost</string>\n'
         '  <key>CFBundleExecutable</key><string>TestHost</string>\n'
         '  <key>CFBundleVersion</key><string>99.0.0</string>\n'
