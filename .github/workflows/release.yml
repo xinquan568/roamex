@@ -76,6 +76,11 @@ jobs:
           esac
           echo "ROAMUX_APP=${app}" >> "$GITHUB_ENV"
 
+      # roam-103: the final universal, renamed bundle must carry the bold-X icon payloads on both
+      # channels (app.icns + Assets.car) BEFORE it is signed and packaged.
+      - name: Icon gate — final universal Roamux.app carries the bold-X payloads
+        run: python3 roamux/build/check_app_icon.py --app "${ROAMUX_APP}" --repo "$(pwd)/roamux"
+
       - name: Set up keychain + sign + notarize + staple (signed mode)
         if: steps.mode.outputs.mode == 'signed'
         env:

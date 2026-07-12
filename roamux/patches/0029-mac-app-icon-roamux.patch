@@ -1,0 +1,20 @@
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -645,12 +645,14 @@ if (is_win) {
+   }
+ 
+   bundle_data("chrome_app_icon") {
+-    sources = [ "app/theme/$branding_path_component/mac/app.icns" ]
++    # Roamux (roam-103): the bold-X icon payload (CFBundleIconFile channel).
++    sources = [ "//roamux/app/resources/icons/mac/app.icns" ]
+     outputs = [ "{{bundle_resources_dir}}/{{source_file_part}}" ]
+   }
+ 
+   bundle_data("chrome_asset_catalog") {
+-    sources = [ "app/theme/$branding_path_component/mac/Assets.car" ]
++    # Roamux (roam-103): the bold-X asset catalog (CFBundleIconName channel — what modern macOS shows).
++    sources = [ "//roamux/app/resources/icons/mac/Assets.car" ]
+     outputs = [ "{{bundle_resources_dir}}/{{source_file_part}}" ]
+   }
+ 

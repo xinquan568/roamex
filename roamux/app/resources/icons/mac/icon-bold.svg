@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Roamux app icon</title>
+  <desc id="desc">A minimal Chrome-inspired Roamux X icon with four Google palette color rays around a white central circle.</desc>
+
+  <defs>
+    <!-- Subtle edge treatment so the white app icon remains legible on white UI surfaces. -->
+    <filter id="iconShadow" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="2" stdDeviation="7" flood-color="#000000" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <!-- White rounded-square app icon background. Transparent corners are intentional. -->
+  <rect x="8" y="8" width="496" height="496" rx="112" fill="#FFFFFF" filter="url(#iconShadow)"/>
+  <rect x="8.5" y="8.5" width="495" height="495" rx="111.5" fill="none" stroke="#DADCE0" stroke-opacity="0.72"/>
+
+  <!--
+    X geometry:
+    - Canvas center: 256,256
+    - White central knockout radius: 72 (unchanged)
+    - Color stroke width: 90.608 (1.618x the original 56), with round caps
+    - Stroke centerlines run from r=52 to r=210 on the diagonals (unchanged).
+      The center disc hides the inner caps, leaving a clean circular negative space.
+
+    Chrome palette:
+    Blue   #4285F4
+    Red    #EA4335
+    Yellow #FBBC05
+    Green  #34A853
+  -->
+  <g fill="none" stroke-linecap="round" stroke-width="90.608">
+    <!-- Top-left arm: Red -->
+    <line x1="219.230" y1="219.230" x2="107.508" y2="107.508" stroke="#EA4335"/>
+
+    <!-- Top-right arm: Yellow -->
+    <line x1="292.770" y1="219.230" x2="404.492" y2="107.508" stroke="#FBBC05"/>
+
+    <!-- Bottom-right arm: Green -->
+    <line x1="292.770" y1="292.770" x2="404.492" y2="404.492" stroke="#34A853"/>
+
+    <!-- Bottom-left arm: Blue -->
+    <line x1="219.230" y1="292.770" x2="107.508" y2="404.492" stroke="#4285F4"/>
+  </g>
+
+  <!-- Central white disc: explicit negative space replacing Chrome's blue center. -->
+  <circle cx="256" cy="256" r="72" fill="#FFFFFF"/>
+</svg>
