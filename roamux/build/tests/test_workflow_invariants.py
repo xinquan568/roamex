@@ -24,6 +24,9 @@ These encode the tier-1 + release posture structurally, so every future workflow
      args file is ONE line whose first '#' comments out every arg, so slices silently build pure
      GN defaults (wrong arch, debug, component, no Sparkle); and it canary-checks the args took
      effect after gn gen plus asserts each slice's arch after compile (roam-114; run 29218872385).
+  10. release.yml gates the assembled bundle's dyld resolution — every @rpath dependency of the
+      framework must resolve via its own LC_RPATHs to a file inside the bundle (roam-121; the
+      v0.0.1-alpha.1 install aborted at first launch on an unresolvable Sparkle rpath).
 """
 
 import pathlib
@@ -261,6 +264,15 @@ class WorkflowInvariantsTest(unittest.TestCase):
                         "args canary missing: is_official_build must be verified after gn gen")
         self.assertTrue(any("lipo -archs" in l and "Release-${cpu}" in l for l in lines),
                         "per-slice arch assert missing: each slice must prove its target_cpu")
+
+    def test_release_gates_framework_rpath(self):
+        # roam-121: an unresolvable @rpath dependency on the framework aborts the
+        # installed app at first launch (dyld: "no LC_RPATH's found"); the pipeline
+        # must gate dyld resolution right after bundle assembly, not on a user's Mac.
+        text = _read("release.yml")
+        self.assertIsNotNone(text, "release.yml missing")
+        self.assertIn("check_framework_rpath.py", text,
+                      "the framework rpath gate must run in the release pipeline")
 
     def test_workflows_carry_spdx(self):
         for wf in sorted(WORKFLOWS.glob("*.yml")):

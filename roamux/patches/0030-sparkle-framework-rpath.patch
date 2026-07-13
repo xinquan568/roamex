@@ -1,0 +1,18 @@
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -1239,6 +1239,14 @@ if (is_win) {
+       # Specify a sensible install_name for static builds. The library is
+       # dlopen()ed so this is not used to resolve the module.
+       ldflags += [ "-Wl,-install_name,@executable_path/../Frameworks/$chrome_framework_name.framework/Versions/$chrome_framework_version/$chrome_framework_name" ]
++
++      if (roamux_enable_sparkle) {
++        # Roamux (roam-121): the framework links Sparkle via @rpath (the updater
++        # lives in browser code); resolve it to the app's Contents/Frameworks —
++        # @loader_path is Versions/<ver>/ inside the framework bundle, identical
++        # for every loading process (browser and helpers).
++        ldflags += [ "-Wl,-rpath,@loader_path/../../.." ]
++      }
+     } else {
+       # In the component build, both the :chrome_app and various
+       # :chrome_helper* targets directly link to the Framework target. Use

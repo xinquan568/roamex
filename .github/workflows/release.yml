@@ -126,6 +126,12 @@ jobs:
       - name: Icon gate — final universal Roamux.app carries the bold-X payloads
         run: python3 roamux/build/check_app_icon.py --app "${ROAMUX_APP}" --repo "$(pwd)/roamux"
 
+      # roam-121: the stub dlopen()s the framework at first launch; every @rpath dependency
+      # of the framework (Sparkle) must resolve via its own LC_RPATHs to a file inside the
+      # bundle — gate it here in seconds, never on a user's Mac.
+      - name: Framework rpath gate — @rpath deps resolve inside the bundle
+        run: python3 roamux/build/check_framework_rpath.py --app "${ROAMUX_APP}"
+
       - name: Set up keychain + sign + notarize + staple (signed mode)
         if: steps.mode.outputs.mode == 'signed'
         env:

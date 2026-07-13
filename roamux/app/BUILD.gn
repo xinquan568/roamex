@@ -62,9 +62,12 @@ if (roamux_enable_sparkle) {
   config("sparkle_link") {
     framework_dirs = [ sparkle_root ]
     frameworks = [ "Sparkle.framework" ]
-    # The bundle copies Sparkle into Contents/Frameworks; the executable and
-    # the framework that links it resolve via the standard Chromium rpaths.
-    ldflags = [ "-Wl,-rpath,@loader_path/../Frameworks" ]
+    # NOTE (roam-121): no ldflags here — GN drops ldflags from source_set configs at
+    # the final link, so an rpath placed here silently never reaches any linked image
+    # (that misdesign shipped an alpha that aborted at first launch). The @rpath
+    # resolution for the bundled Sparkle lives on the linking target itself: patch
+    # 0030 puts -Wl,-rpath,@loader_path/../../.. on chrome_framework, and
+    # roamux/build/check_framework_rpath.py gates it in the release pipeline.
   }
 
   # Obj-C++ updater surface, compiled only when the flag is on. The
