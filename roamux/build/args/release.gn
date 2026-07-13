@@ -13,5 +13,10 @@ symbol_level = 1
 target_os = "mac"
 # target_cpu is supplied per-slice on the gn gen command line (arm64 / x64).
 
+# roam-116: the pinned checkout syncs without checkout_pgo_profiles, so official-build PGO
+# would demand missing .profdata at gn gen. Personal-alpha skips PGO deliberately —
+# a hermetic pinned checkout over the few-% perf.
+chrome_pgo_phase = 0
+
 # roam-32: bundle Sparkle + compile the updater in release artifacts.
 roamux_enable_sparkle = true
