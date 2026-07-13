@@ -17,6 +17,9 @@ These encode the tier-1 + release posture structurally, so every future workflow
   7. release.yml declares an explicit, generous job timeout — without one, GitHub's default 6h cap
      applies (self-hosted runners included) and a cold universal2 build is service-cancelled
      mid-compile (roam-110; run 29195822447 died at exactly 6h00m).
+  8. release.yml creates the universal out dir (out/Release) before invoking Chromium's
+     universalizer — the upstream script os.mkdir()s its output bundle and requires the parent to
+     exist; a fresh builder has neither (roam-112; run 29214000668 died post-compile).
 """
 
 import pathlib
@@ -217,6 +220,23 @@ class WorkflowInvariantsTest(unittest.TestCase):
                                 "(GitHub's silent default is 6h — too short for a cold build)")
         self.assertGreaterEqual(int(m.group(1)), 720,
                                 "release timeout must comfortably exceed the 6h default")
+
+    def test_release_creates_universal_out_dir_before_universalizer(self):
+        # roam-112: chrome/installer/mac/universalizer.py os.mkdir()s its output bundle path, so
+        # its PARENT (out/Release) must exist; a fresh builder has neither, and run 29214000668
+        # died with FileNotFoundError after both arch slices had built successfully. The workflow
+        # must create the dir before the invocation (workflow-side fix — the upstream script is
+        # not ours to edit in place).
+        text = _read("release.yml")
+        self.assertIsNotNone(text, "release.yml missing")
+        lines = text.splitlines()
+        mk = next((i for i, l in enumerate(lines)
+                   if "mkdir -p" in l and "/out/Release\"" in l), None)
+        self.assertIsNotNone(
+            mk, "the universal out dir must be created (mkdir -p .../out/Release)")
+        uni = next((i for i, l in enumerate(lines) if "universalizer.py" in l), None)
+        self.assertIsNotNone(uni, "universalizer invocation missing from release.yml")
+        self.assertLess(mk, uni, "out/Release must be created BEFORE the universalizer runs")
 
     def test_workflows_carry_spdx(self):
         for wf in sorted(WORKFLOWS.glob("*.yml")):

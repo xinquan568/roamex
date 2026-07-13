@@ -92,6 +92,12 @@ jobs:
             ( cd "${CHROMIUM_SRC}" && gn gen "out/Release-${cpu}" --args="${args} target_cpu=\"${cpu}\"" )
             autoninja -C "${CHROMIUM_SRC}/out/Release-${cpu}" chrome
           done
+          # roam-112: the universalizer os.mkdir()s its output bundle and needs the PARENT to
+          # exist (a fresh builder has no out/Release); a stale Chromium.app from an interrupted
+          # prior run would also make that mkdir fail, so clear it (rename_bundle already
+          # self-heals a stale Roamux.app).
+          mkdir -p "${CHROMIUM_SRC}/out/Release"
+          rm -rf "${CHROMIUM_SRC}/out/Release/Chromium.app"
           python3 "${CHROMIUM_SRC}/chrome/installer/mac/universalizer.py" \
             "${CHROMIUM_SRC}/out/Release-arm64/Chromium.app" \
             "${CHROMIUM_SRC}/out/Release-x64/Chromium.app" \
