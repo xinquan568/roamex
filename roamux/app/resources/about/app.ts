@@ -3,6 +3,11 @@
 // check row, bound to roam-85's update state machine via the browser proxy.
 // Termixion's AboutSettings.tsx minus the configuration groups.
 
+// roam-136: pull the loadTimeData payload (productName/version/updatesAvailable)
+// the C++ UseStringsJs() source serves, BEFORE any loadTimeData access below —
+// without it the element constructor asserts "No data" and the page renders blank.
+import '/strings.m.js';
+
 import './update_page.mojom-webui.js';
 
 import {CrLitElement} from '//resources/lit/v3_0/lit.rollup.js';

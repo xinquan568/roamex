@@ -3,12 +3,13 @@
 // the status matrix, Download→progress→Restart, Skip hides the card, NO
 // configuration/reset groups, identity + links. (TDD/P6.)
 
+// app.js itself pulls in strings.m.js (roam-136), so loadTimeData carries the
+// REAL data-source values (productName, version, updatesAvailable) by the time
+// the element is constructed — the identity test pins the real brand string.
+// This suite deliberately does NOT import strings.m.js on its own: doing so
+// masked roam-136 (the production page renders blank when app.ts forgets the
+// import), so the suite now genuinely exercises the production bootstrap.
 import 'chrome://roamux-about/app.js';
-// Populate loadTimeData with the REAL data-source values (productName,
-// version, updatesAvailable) — the element reads them at construction, and
-// the identity test pins the real brand string, not a test-injected one.
-// (roam-93 unbreak: first-ever execution of this suite surfaced the miss.)
-import 'chrome://roamux-about/strings.m.js';
 
 import {RoamuxAboutAppElement} from 'chrome://roamux-about/app.js';
 import {BrowserProxyImpl} from 'chrome://roamux-about/browser_proxy.js';
