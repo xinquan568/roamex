@@ -225,4 +225,12 @@ test("roamux_browsertests") {
     "//ui/views",
     "//url",
   ]
+
+  # roam-140: the live settings/help update path (factory ProfileSelection +
+  # the real SettingsUI Mojo binder) only exists when the Sparkle-backed update
+  # service is compiled in.
+  if (roamux_enable_sparkle) {
+    sources += [ "test/roamux_update_service_factory_browsertest.cc" ]
+    deps += [ "//roamux/browser/updates:update_service" ]
+  }
 }

@@ -5,6 +5,7 @@
 
 #include <utility>
 
+#include "base/callback_list.h"
 #include "base/functional/callback.h"
 #include "base/strings/sys_string_conversions.h"
 
@@ -155,17 +156,26 @@ namespace roamux::updates {
 // by the app-launch roamux::app::InitSparkleUpdater(). Created — and started,
 // with scheduled background checks enabled — on first
 // GetOrCreateSharedSparkleOwner(), then process-lived (never torn down) so the
-// app-wide scheduled checks keep running across profile teardown. The event
-// callback is re-pointed at whichever facade is currently bound via a shared
-// sink; the sink holds a WeakPtr-bound callback, so a facade going away
-// self-cancels without leaving a dangling callback. (roam-140: retiring the
-// second SPUStandardUpdaterController owner — two owners on one bundle were the
+// app-wide scheduled checks keep running across profile teardown. Because
+// updates are app-wide, every live per-profile facade subscribes its own event
+// sink via AddEventSink(): a Sparkle callback is broadcast to ALL current
+// subscribers, so two settings/help pages (e.g. two regular profiles) both
+// reflect the same update state (roam-140 fix — the old single re-pointed sink
+// was last-writer-wins and silently starved the earlier facade). Each sink is a
+// WeakPtr-bound callback held alive by the subscribing facade's
+// CallbackListSubscription, so a facade going away auto-unregisters and leaves
+// no dangling callback. (roam-140: retiring the second
+// SPUStandardUpdaterController owner — two owners on one bundle were the
 // second-click hang — leaves exactly one owner here.)
 class SparkleOwner {
  public:
   static SparkleOwner* GetOrCreate();
 
-  void SetEventSink(EventCallback cb) { *sink_ = std::move(cb); }
+  // Subscribe a facade's event sink; the returned subscription auto-unregisters
+  // when the caller (the per-profile facade) is destroyed.
+  base::CallbackListSubscription AddEventSink(EventCallback cb) {
+    return sinks_.Add(std::move(cb));
+  }
 
   void CheckForUpdates() { [updater_ checkForUpdates]; }
   void Download() { [driver_ commandDownload]; }
@@ -176,17 +186,11 @@ class SparkleOwner {
 
  private:
   SparkleOwner() {
-    sink_ = std::make_shared<EventCallback>();
-    auto sink = sink_;
+    // base::Unretained is safe: SparkleOwner is a process-lived singleton that
+    // is never destroyed, so the driver's callback always has a live owner.
     driver_ = [[RoamuxUpdateUserDriver alloc]
-        initWithCallback:base::BindRepeating(
-                             [](std::shared_ptr<EventCallback> s,
-                                const UpdateEvent& e) {
-                               if (*s) {
-                                 s->Run(e);
-                               }
-                             },
-                             sink)];
+        initWithCallback:base::BindRepeating(&SparkleOwner::NotifySinks,
+                                             base::Unretained(this))];
     updater_ = [[SPUUpdater alloc] initWithHostBundle:[NSBundle mainBundle]
                                     applicationBundle:[NSBundle mainBundle]
                                            userDriver:driver_
@@ -200,7 +204,9 @@ class SparkleOwner {
   }
   ~SparkleOwner() = default;
 
-  std::shared_ptr<EventCallback> sink_;
+  void NotifySinks(const UpdateEvent& e) { sinks_.Notify(e); }
+
+  base::RepeatingCallbackList<void(const UpdateEvent&)> sinks_;
   RoamuxUpdateUserDriver* driver_ = nil;
   SPUUpdater* updater_ = nil;
 };
@@ -224,18 +230,19 @@ SparkleOwner* GetOrCreateSharedSparkleOwner() {
 
 RoamuxUpdateService::RoamuxUpdateService() {
   // Bind this per-profile facade to the ONE process-wide owner (also created at
-  // launch by InitSparkleUpdater) and route its events here. The sink holds a
-  // WeakPtr-bound callback, so it self-cancels if this facade is destroyed.
+  // launch by InitSparkleUpdater) and SUBSCRIBE its own event sink. Multiple
+  // facades can be subscribed at once (app-wide broadcast); the subscription is
+  // WeakPtr-bound and held by this facade, so it auto-unregisters on teardown
+  // without clobbering a sibling facade.
   shared_owner_ = GetOrCreateSharedSparkleOwner();
-  shared_owner_->SetEventSink(base::BindRepeating(
+  sink_subscription_ = shared_owner_->AddEventSink(base::BindRepeating(
       &RoamuxUpdateService::OnUpdateEvent, weak_factory_.GetWeakPtr()));
 }
 
 RoamuxUpdateService::~RoamuxUpdateService() {
-  // The owner is process-lived and persists across facade teardown; the event
-  // sink is a WeakPtr-bound callback that self-cancels when this facade dies,
-  // so no explicit unbind is needed (and unbinding here would clobber a
-  // concurrently-bound sibling facade).
+  // The owner is process-lived and persists across facade teardown. Dropping
+  // sink_subscription_ (member destruction) auto-unregisters this facade's sink
+  // from the owner's broadcast list — no sibling facade is affected.
   shared_owner_ = nullptr;
 }
 

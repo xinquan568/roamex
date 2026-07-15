@@ -230,14 +230,20 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
  import("//chrome/common/features.gni")
  import("//components/captive_portal/core/features.gni")
  import("//components/compose/features.gni")
-@@ -5715,6 +5716,16 @@
+@@ -5715,6 +5716,22 @@
      "//roamux/browser/tab_visit/tab_visit_command.cc",
      "//roamux/browser/tab_visit/tab_visit_command.h",
    ]
 +
-+  # Roamux (roam-140): SettingsUI::BindInterface delegates the settings/help
-+  # update-page factory to the per-profile RoamuxUpdateService. Sparkle-gated
-+  # to match settings_ui.{h,cc}; the target only exists when compiled in.
++  # Roamux (roam-140): settings_ui.{h,cc} include the generated
++  # roamux/app/app_buildflags.h UNCONDITIONALLY (to test
++  # BUILDFLAG(ROAMUX_ENABLE_SPARKLE)), so its generator is an unconditional dep
++  # — a clean build must not compile settings_ui before the header exists.
++  deps += [ "//roamux/app:app_buildflags" ]
++
++  # SettingsUI::BindInterface delegates the settings/help update-page factory to
++  # the per-profile RoamuxUpdateService. Sparkle-gated to match settings_ui.cc;
++  # the update_service target only exists when compiled in.
 +  if (roamux_enable_sparkle) {
 +    deps += [
 +      "//roamux/browser/updates:update_service",

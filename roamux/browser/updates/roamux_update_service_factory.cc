@@ -25,10 +25,13 @@ RoamuxUpdateServiceFactory* RoamuxUpdateServiceFactory::GetInstance() {
 RoamuxUpdateServiceFactory::RoamuxUpdateServiceFactory()
     : ProfileKeyedServiceFactory(
           "RoamuxUpdateService",
-          // Regular profiles only — no update UI in OTR/system; the single
-          // process-wide Sparkle owner backs every per-profile facade.
+          // Regular (original) profiles only — no update UI in OTR/system, so
+          // the branded settings/help update card degrades there
+          // (updatesAvailable=false). roam-140: kOriginalOnly (NOT
+          // kRedirectedToOriginal — that would hand OTR the original's service
+          // and wrongly light up the update card off the record).
           ProfileSelections::Builder()
-              .WithRegular(ProfileSelection::kRedirectedToOriginal)
+              .WithRegular(ProfileSelection::kOriginalOnly)
               .WithGuest(ProfileSelection::kNone)
               .WithSystem(ProfileSelection::kNone)
               .Build()) {}

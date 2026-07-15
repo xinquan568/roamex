@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "components/keyed_service/core/keyed_service.h"
@@ -70,8 +71,11 @@ class RoamuxUpdateService : public KeyedService,
   void PushSnapshot(const UpdateSnapshot& snapshot);
 
   UpdateStateMachine state_machine_;
-  // Ref-counted process-wide Sparkle owner (not owned uniquely).
+  // The single process-wide Sparkle owner (not owned uniquely; process-lived).
   raw_ptr<SparkleOwner> shared_owner_ = nullptr;
+  // This facade's subscription to the owner's app-wide event broadcast; dropping
+  // it (on destruction) auto-unregisters the sink (roam-140).
+  base::CallbackListSubscription sink_subscription_;
   mojo::Receiver<mojom::UpdatePageHandlerFactory> factory_receiver_{this};
   mojo::Receiver<mojom::UpdatePageHandler> handler_receiver_{this};
   mojo::Remote<mojom::UpdatePage> page_;
