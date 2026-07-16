@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """roam-33 / roam-97 sign driver — resolves the signing mode and, in signed
 mode, signs the universal2 Roamux.app inside-out with the Sparkle parts injected
-BEFORE the outer app (so the outer seal stays valid), then staples.
+BEFORE the outer app (so the outer seal stays valid), then promotes it.
 
 Model B (roam-97). Chromium's mac signer (chrome/installer/mac/signing) is
-consumed as a LIBRARY, IN-PROCESS — not shelled out to. Three things make the
+consumed as a LIBRARY, IN-PROCESS — not shelled out to. Four things make the
 dormant signed path internally consistent:
 
   1. Config seam. Chromium's `driver.main` resolves its config solely through
@@ -17,25 +17,35 @@ dormant signed path internally consistent:
      nested framework/helper part paths resolve to the on-disk Chromium bundles
      `rename_bundle.py` leaves.
 
-  2. App-signing-only + output contract. Chromium's `pipeline.sign_all` copies
+  2. BUILT-package import. `config_factory.get_class()` needs the GN-generated
+     `signing.build_props_config`, which exists ONLY in the built
+     `<root_out_dir>/Chromium Packaging/signing/` — never in
+     `CHROMIUM_SRC/chrome/installer/mac` (source). So the signer is imported
+     from the BUILT package, resolved from $ROAMUX_CHROMIUM_OUT / $CHROMIUM_OUT
+     or the `--input` `Chromium Packaging` dir (see `_resolve_signing_pkg_dir`).
+     The plan/preview path imports NO source `signing`, so the built package is
+     never shadowed by a cached source copy.
+
+  3. App-signing-only + output contract. Chromium's `pipeline.sign_all` copies
      the app input->work, signs it in the work dir, and its *product* is a
      packaged DMG/PKG in `--output` — the bare signed `.app` is not left usable
-     in `--output` by default. Roamux owns packaging (its zip + Sparkle EdDSA)
-     and its own notary/staple, so the signer is driven for APP-SIGNING ONLY
+     in `--output` by default. Roamux owns packaging (its zip + Sparkle EdDSA),
+     so the signer is driven for APP-SIGNING ONLY
      (`--disable-packaging --notarize none`). Under that mode the bare signed
      app lands at `<output>/stable/<app_product>.app` (see
-     `signed_app_output_path`); Roamux promotes it onto the release path and
-     staples THAT.
+     `signed_app_output_path`); Roamux promotes it onto the release path.
 
-  3. CLI contract. `--input` is the DIRECTORY containing Roamux.app (not the
+  4. CLI contract. `--input` is the DIRECTORY containing Roamux.app (not the
      `.app` path); `--output` is a separate required dir; there is NO
      `--entitlements` flag (entitlements are config/packaging-derived).
 
-The real codesign/notarize/staple only runs in the release job with the
-protected credentials; this module is unit-covered for its decision + plan
-construction and dry-runnable elsewhere. `--dry-run` routes through a
-no-side-effect planning function and never calls the real Sparkle codesign,
-Chromium's driver/pipeline, or the stapler.
+Notarization + stapling (the real signed E2E) are DEFERRED to #90: signed mode
+signs the Sparkle parts + outer app and promotes the result, but does NOT run
+`xcrun stapler staple` (which requires a completed notarization ticket this
+dormant path does not obtain). The --notary-* args are threaded but unused; #90
+wires the notarytool submit + staple. `--dry-run` routes through a no-side-effect
+planning function and never calls the real Sparkle codesign, Chromium's
+driver/pipeline, or the stapler.
 """
 
 import argparse
@@ -56,6 +66,14 @@ import roamux_signing_config  # noqa: E402
 # Distribution) -> "stable". See signed_app_output_path().
 _SIGNER_DIST_SUBDIR = "stable"
 
+# Model B: config.product is inherited "Chromium", so chrome/installer/mac/
+# BUILD.gn copies the BUILT signing package (and GENERATES build_props_config.py)
+# under "<root_out_dir>/Chromium Packaging/signing/". Chromium's driver also
+# expects `--input` to contain that "Chromium Packaging/" dir. See
+# _resolve_signing_pkg_dir().
+_PACKAGING_PRODUCT = "Chromium"
+_PACKAGING_SUBDIR = _PACKAGING_PRODUCT + " Packaging"
+
 
 def _run(cmd, dry_run):
     print("+ " + " ".join(str(c) for c in cmd))
@@ -63,27 +81,36 @@ def _run(cmd, dry_run):
         subprocess.run(cmd, check=True)
 
 
-def _chromium_mac_dir(chromium_src):
-    return pathlib.Path(chromium_src) / "chrome" / "installer" / "mac"
+def _resolve_signing_pkg_dir(input_dir, env=None):
+    """Return the directory that must be on sys.path to import the BUILT Chromium
+    `signing` package — the one carrying the GN-generated `build_props_config.py`
+    that `config_factory.get_class()` requires — or None if it can't be located.
 
-
-def _ensure_signing_on_path(chromium_src):
-    """Put Chromium's signing package dir on sys.path so `signing.*` imports."""
-    mac = str(_chromium_mac_dir(chromium_src))
-    if mac not in sys.path:
-        sys.path.insert(0, mac)
-    return mac
-
-
-def resolve_roamux_config_class(chromium_src):
-    """Return the Model-B RoamuxCodeSignConfig subclass over Chromium's real
-    config base, or None if the Chromium signing config is not importable here
-    (e.g. a source-only checkout where build_props_config.py — GN-generated — is
-    absent)."""
-    base = roamux_signing_config.load_chromium_config_base(chromium_src)
-    if base is None:
-        return None
-    return roamux_signing_config.make_roamux_config_class(base)
+    chrome/installer/mac/BUILD.gn copies the signer to
+    `<root_out_dir>/<product> Packaging/signing/` and GENERATES
+    `<root_out_dir>/<product> Packaging/signing/build_props_config.py` there — it
+    does NOT exist in the source tree (`CHROMIUM_SRC/chrome/installer/mac`), so
+    importing the signing package from source fails with ModuleNotFoundError
+    before the Roamux seam even runs. Chromium's driver also expects `--input` to
+    contain that `<product> Packaging/` dir (`model.Paths.packaging_dir` joins
+    input + '<product> Packaging'). Under Model B `config.product` == "Chromium".
+    Resolve, in order:
+      1. $ROAMUX_CHROMIUM_OUT / $CHROMIUM_OUT  ->  <out>/Chromium Packaging
+      2. the --input directory                  ->  <input>/Chromium Packaging
+    A candidate qualifies ONLY if it contains `signing/build_props_config.py`
+    (the generated file that distinguishes a BUILT package from the source tree).
+    """
+    env = os.environ if env is None else env
+    candidates = []
+    out = env.get("ROAMUX_CHROMIUM_OUT") or env.get("CHROMIUM_OUT")
+    if out:
+        candidates.append(pathlib.Path(out) / _PACKAGING_SUBDIR)
+    if input_dir:
+        candidates.append(pathlib.Path(input_dir) / _PACKAGING_SUBDIR)
+    for c in candidates:
+        if (c / "signing" / "build_props_config.py").is_file():
+            return str(c)
+    return None
 
 
 def signed_app_output_path(output_dir, app_product="Roamux"):
@@ -109,69 +136,57 @@ def signed_app_output_path(output_dir, app_product="Roamux"):
         "{}.app".format(app_product))
 
 
-def _chromium_part_keys(roamux_cfg_cls, chromium_src):
-    """Ordered part keys from Chromium's own get_parts, driven with the ROAMUX
-    config (Model B: nested keys equal the base's), outer app ('app') last."""
-    import importlib
-    _ensure_signing_on_path(chromium_src)
-    parts_mod = importlib.import_module("signing.parts")
-    cfg = roamux_cfg_cls(invoker=lambda c: None, identity="-")
-    keys = list(parts_mod.get_parts(cfg).keys())
-    # Chromium keys the outer app as 'app'; ensure it is last.
-    if "app" in keys:
-        keys = [k for k in keys if k != "app"] + ["app"]
-    return keys
-
-
-def _resolve_part_keys(chromium_src):
-    """The ordered Chromium part keys, or a preview fallback when the signing
-    package (or the GN-generated config) isn't importable here."""
-    cfg_cls = resolve_roamux_config_class(chromium_src)
-    if cfg_cls is not None:
-        try:
-            return _chromium_part_keys(cfg_cls, chromium_src)
-        except Exception as e:  # noqa: BLE001 — degrade to preview keys
-            print("note: could not derive Chromium part keys ({}); using "
-                  "preview keys".format(e))
-    return ["chromium_framework", "chromium_helpers", "app"]
-
-
-def _config_identity(chromium_src):
-    """Resolve the Model-B config identity for the plan preview.
-
-    Applies and RESTORES the `config_factory.get_class` seam only long enough to
-    instantiate RoamuxCodeSignConfig (real build env); degrades to the known
-    Model-B constants when Chromium's config isn't importable here."""
-    identity = {"product": "Chromium", "app_product": "Roamux",
-                "base_bundle_id": "com.roamux.Roamux", "class_name": None}
-    cfg_cls = resolve_roamux_config_class(chromium_src)
-    if cfg_cls is None:
-        return identity
-    _ensure_signing_on_path(chromium_src)
-    import signing.config_factory as cf
-    original_get_class = cf.get_class
-    cf.get_class = lambda: cfg_cls
+def _built_part_keys(input_dir, env=None):
+    """Ordered Chromium part keys from the BUILT signing package (the same one
+    driver.main will use), outer app ('app') last — or None if the built package
+    can't be resolved/imported. Informational only: feeds the plan preview's
+    sign-order line. NEVER imports the source `signing` tree (which lacks
+    build_props_config.py and would shadow the built package once cached)."""
+    pkg_dir = _resolve_signing_pkg_dir(input_dir, env)
+    if pkg_dir is None:
+        return None
+    if pkg_dir not in sys.path:
+        sys.path.insert(0, pkg_dir)
     try:
-        cfg = cfg_cls(invoker=lambda c: None, identity="-")
-        identity.update(product=cfg.product, app_product=cfg.app_product,
-                        base_bundle_id=cfg.base_bundle_id,
-                        class_name=cfg_cls.__name__)
-    except Exception:  # noqa: BLE001 — keep the constants
-        pass
-    finally:
-        cf.get_class = original_get_class
-    return identity
+        import importlib
+        cf = importlib.import_module("signing.config_factory")
+        parts_mod = importlib.import_module("signing.parts")
+        roamux_cls = roamux_signing_config.make_roamux_config_class(
+            cf.get_class())
+        cfg = roamux_cls(invoker=lambda c: None, identity="-")
+        keys = list(parts_mod.get_parts(cfg).keys())
+        if "app" in keys:  # Chromium keys the outer app 'app'; ensure it is last.
+            keys = [k for k in keys if k != "app"] + ["app"]
+        return keys
+    except Exception:  # noqa: BLE001 — preview only; degrade to static keys
+        return None
 
 
-def build_signing_plan(args, identity, chromium_src):
-    """Resolve the full signing plan with NO side effects (used by --dry-run and
-    as the input to the real signed run)."""
+def _config_identity():
+    """The Model-B config identity for the plan preview — deterministic constants.
+
+    Chromium's config couples `app_product` (outer app) and `product` (nested
+    parts); Model B rebrands only the outer app, so `product` is inherited
+    "Chromium" while `app_product`/`base_bundle_id` are Roamux. Reading these
+    back off a live config would require importing the BUILT signing package
+    (build_props_config.py) — that import is deferred to `_invoke_chromium_signer`
+    at signing time — so the preview uses the known constants and imports
+    nothing (no source `signing` gets cached)."""
+    return {"product": "Chromium", "app_product": "Roamux",
+            "base_bundle_id": "com.roamux.Roamux"}
+
+
+def build_signing_plan(args, identity):
+    """Resolve the full signing plan with NO side effects beyond an optional
+    read-only import of the BUILT signing package for the sign-order preview
+    (used by --dry-run and as the input to the real signed run)."""
     input_dir = str(pathlib.Path(args.app).resolve().parent)
     release_app = str(pathlib.Path(args.app).resolve())
     output_dir = args.output
     signer_app = signed_app_output_path(output_dir)
-    config = _config_identity(chromium_src)
-    chromium_keys = _resolve_part_keys(chromium_src)
+    config = _config_identity()
+    chromium_keys = _built_part_keys(input_dir) or [
+        "chromium_framework", "chromium_helpers", "app"]
     ordered = roamux_signing_config.roamux_get_parts({}, chromium_keys)
     outer = chromium_keys[-1]
     # Invariants: outer app sealed last; Sparkle parts before it.
@@ -185,7 +200,6 @@ def build_signing_plan(args, identity, chromium_src):
         "output_dir": output_dir,
         "release_app": release_app,
         "signer_app": signer_app,
-        "chromium_src": chromium_src,
         "config": config,
         "ordered": ordered,
         "outer_key": outer,
@@ -194,10 +208,8 @@ def build_signing_plan(args, identity, chromium_src):
 
 def print_plan(plan):
     c = plan["config"]
-    cls = c["class_name"] or ("RoamuxCodeSignConfig [constants — Chromium "
-                              "config not importable here]")
     print("=== roam-97 signed-release plan (Model B) ===")
-    print("config: {}".format(cls))
+    print("config: RoamuxCodeSignConfig")
     print("  product={} app_product={} base_bundle_id={}".format(
         c["product"], c["app_product"], c["base_bundle_id"]))
     print("paths (model.Paths): input={} output={}".format(
@@ -208,6 +220,7 @@ def print_plan(plan):
     print("sign order: " + " -> ".join(plan["ordered"]))
     print("final signed app (from signer) -> {}".format(plan["signer_app"]))
     print("promoted to release path -> {}".format(plan["release_app"]))
+    print("notarization + stapling: DEFERRED to #90 (real signed E2E)")
 
 
 def sign_sparkle_parts(app_path, identity, dry_run):
@@ -223,19 +236,32 @@ def sign_sparkle_parts(app_path, identity, dry_run):
     return parts
 
 
-def _invoke_chromium_signer(identity, input_dir, output_dir, chromium_src):
+def _invoke_chromium_signer(identity, input_dir, output_dir):
     """Drive Chromium's signer IN-PROCESS for APP-SIGNING ONLY, with the Roamux
     config installed via the config_factory seam (restored in a finally).
 
-    `--disable-packaging --notarize none`: Roamux owns packaging + notary/staple,
-    so Chromium's pipeline must not build a DMG/PKG. Returns the installed Roamux
-    config class."""
-    _ensure_signing_on_path(chromium_src)
+    Imports the BUILT signing package (resolved from $ROAMUX_CHROMIUM_OUT /
+    $CHROMIUM_OUT or the --input `Chromium Packaging` dir) — NOT the source tree —
+    because `config_factory.get_class()` needs the GN-generated
+    build_props_config.py, which lives only in the built package. Nothing in the
+    plan path imports source `signing`, so the built package is never shadowed by
+    a cached source copy.
+
+    `--disable-packaging --notarize none`: Roamux owns packaging; notarization +
+    stapling are DEFERRED to #90. Returns the installed Roamux config class."""
+    pkg_dir = _resolve_signing_pkg_dir(input_dir)
+    if pkg_dir is None:
+        raise RuntimeError(
+            "cannot locate the BUILT Chromium signing package (with the "
+            "GN-generated build_props_config.py). Set ROAMUX_CHROMIUM_OUT to the "
+            "build output dir, or ensure <input>/{} exists.".format(
+                _PACKAGING_SUBDIR))
+    if pkg_dir not in sys.path:
+        sys.path.insert(0, pkg_dir)
     import signing.config_factory as cf
     import signing.driver as driver
 
-    base = cf.get_class()
-    roamux_cls = roamux_signing_config.make_roamux_config_class(base)
+    roamux_cls = roamux_signing_config.make_roamux_config_class(cf.get_class())
     original_get_class = cf.get_class
     cf.get_class = lambda: roamux_cls
     try:
@@ -278,13 +304,18 @@ def run_signed(args, plan):
     # 2) Chromium's signer (config seam, app-signing only) writes the signed app
     #    to <output>/stable/Roamux.app.
     _invoke_chromium_signer(plan["identity"], plan["input_dir"],
-                            plan["output_dir"], plan["chromium_src"])
+                            plan["output_dir"])
     # 3) Promote the signed app onto the release path.
     promote_signed_app(plan["output_dir"], plan["release_app"])
-    # 4) Roamux owns the staple of the promoted signed app.
-    _run(["xcrun", "stapler", "staple", plan["release_app"]], dry_run=False)
-    print("signing-mode=signed — Sparkle parts + outer app signed, promoted, "
-          "stapled.")
+    # 4) roam-97: the app is signed + promoted. Notarization and stapling — the
+    #    real signed E2E — are DEFERRED to #90. We intentionally do NOT run
+    #    `xcrun stapler staple` here: stapling REQUIRES a completed notarization
+    #    ticket, and no notarytool submission happens in this dormant path. The
+    #    --notary-* args are threaded but unused; #90 wires the notarytool submit
+    #    + staple. Returning success means "app signed + promoted".
+    print("signing-mode=signed — Sparkle parts + outer app signed and promoted "
+          "to {}. Notarization + stapling DEFERRED to #90 (real signed E2E); "
+          "the --notary-* args are unused here.".format(plan["release_app"]))
     return 0
 
 
@@ -298,8 +329,10 @@ def _build_parser():
                              "from <output>/stable/Roamux.app")
     parser.add_argument("--identity", default="",
                         help="Developer ID identity (signed mode)")
-    # Notary credentials are Roamux-owned (notary/staple happen outside the
-    # Chromium app-signing call); kept for interface stability.
+    # Notary credentials: threaded but UNUSED in roam-97 — notarization +
+    # stapling (the real signed E2E) are deferred to #90, which wires the
+    # `xcrun notarytool submit` + `xcrun stapler staple` steps. Kept so the
+    # release caller's interface is stable across the #90 cutover.
     parser.add_argument("--notary-key", default="")
     parser.add_argument("--notary-key-id", default="")
     parser.add_argument("--notary-issuer", default="")
@@ -342,8 +375,7 @@ def main(argv=None):
               "<output>/stable/Roamux.app)", file=sys.stderr)
         return 2
 
-    chromium_src = os.environ.get("CHROMIUM_SRC", ".")
-    plan = build_signing_plan(args, identity, chromium_src)
+    plan = build_signing_plan(args, identity)
     print_plan(plan)
 
     if args.dry_run:

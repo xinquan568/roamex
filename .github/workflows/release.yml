@@ -150,7 +150,7 @@ jobs:
       - name: Framework rpath gate — @rpath deps resolve inside the bundle
         run: python3 roamux/build/check_framework_rpath.py --app "${ROAMUX_APP}"
 
-      - name: Set up keychain + sign + notarize + staple (signed mode)
+      - name: Set up keychain + sign + promote (signed mode; notarize/staple deferred to #90)
         if: steps.mode.outputs.mode == 'signed'
         env:
           ROAMUX_DEVELOPER_ID_CERT_P12: ${{ secrets.ROAMUX_DEVELOPER_ID_CERT_P12 }}
@@ -162,10 +162,19 @@ jobs:
           bash roamux/app/release/keychain_setup.sh
           # Same-step: $GITHUB_ENV is not yet visible here, so source the file.
           source "${RUNNER_TEMP}/roamux-signing/env.sh"
+          # roam-97: Chromium's signer needs the BUILT signing package (the
+          # GN-generated build_props_config.py under "<out>/Chromium Packaging/
+          # signing") — point sign_roamux at the build output dir.
+          export ROAMUX_CHROMIUM_OUT="${CHROMIUM_SRC}/out/Release"
+          # roam-97: the signer requires a separate --output DIR and leaves the
+          # bare signed app at <output>/stable/Roamux.app (which sign_roamux then
+          # promotes back onto ROAMUX_APP).
+          mkdir -p "${RUNNER_TEMP}/roamux-signing/out"
           python3 roamux/app/release/sign_roamux.py \
             --mode signed \
             --app "${ROAMUX_APP}" \
             --identity "${ROAMUX_SIGN_IDENTITY}" \
+            --output "${RUNNER_TEMP}/roamux-signing/out" \
             --notary-key "${ROAMUX_NOTARY_KEY_PATH}" \
             --notary-key-id "${ROAMUX_NOTARY_KEY_ID}" \
             --notary-issuer "${ROAMUX_NOTARY_ISSUER_ID}"
@@ -173,9 +182,11 @@ jobs:
       - name: Verify signed artifact (signed mode)
         if: steps.mode.outputs.mode == 'signed'
         run: |
+          # roam-97: verify the signature we actually produce. Notarization +
+          # stapling are DEFERRED to #90 (real signed E2E), so `xcrun stapler
+          # validate` / `spctl --assess` — which require a notarization ticket —
+          # are deferred with them (they cannot pass until #90 submits to notary).
           codesign --verify --strict --deep --verbose=2 "${ROAMUX_APP}"
-          xcrun stapler validate "${ROAMUX_APP}"
-          spctl --assess --type execute --verbose=4 "${ROAMUX_APP}"
 
       - name: Log unsigned artifact state (unsigned mode)
         if: steps.mode.outputs.mode == 'unsigned'

@@ -385,6 +385,38 @@ class WorkflowInvariantsTest(unittest.TestCase):
         self.assertTrue(any("::error::rebrand gate" in l for l in lines),
                         "the rebrand gate must fail the release loudly (::error::)")
 
+    def test_release_signed_invocation_passes_input_dir_and_output(self):
+        # roam-97: sign_roamux.py signed mode now requires --output (a separate
+        # dir); Chromium's signer takes an --input DIRECTORY (sign_roamux derives
+        # it from --app's parent) and leaves the bare signed app at
+        # <output>/stable/Roamux.app. The signed release invocation must pass both
+        # --app (whose parent is the signer input dir) and --output, or it returns
+        # 2 and never reaches the fixed path.
+        text = _read("release.yml")
+        self.assertIsNotNone(text, "release.yml missing")
+        # Reconstruct backslash-continued shell commands, then find the signed
+        # sign_roamux.py invocation.
+        cmds, cur = [], []
+        for line in text.splitlines():
+            s = line.strip()
+            cur.append(s)
+            if not s.endswith("\\"):
+                cmds.append(" ".join(c.rstrip("\\").strip() for c in cur))
+                cur = []
+        signed = [c for c in cmds
+                  if "sign_roamux.py" in c and "--mode signed" in c]
+        self.assertTrue(signed,
+                        "release.yml must invoke sign_roamux.py in signed mode")
+        for c in signed:
+            self.assertIn("--app", c,
+                          "signed invocation must pass --app (its parent is the "
+                          "signer --input directory)")
+            self.assertIn("--output", c,
+                          "roam-97: signed invocation must pass --output "
+                          "(Chromium's signer requires a separate output dir)")
+            self.assertIn("RUNNER_TEMP", c,
+                          "the signer --output dir should live under $RUNNER_TEMP")
+
     def test_workflows_carry_spdx(self):
         for wf in sorted(WORKFLOWS.glob("*.yml")):
             head = "\n".join(wf.read_text().splitlines()[:3])

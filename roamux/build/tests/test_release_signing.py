@@ -481,14 +481,22 @@ class RoamuxSignerSeamTest(unittest.TestCase):
         output_dir = tmp / "out"
         # Simulate the signer leaving the bare signed app where pipeline.py does.
         _make_renamed_bundle(output_dir / "stable")         # out/stable/Roamux.app
+        # A BUILT signing package under the --input dir (build_props_config.py
+        # present) so _resolve_signing_pkg_dir picks it — the source tree lacks
+        # that generated file (roam-97 Fix 1).
+        built_sig = input_dir / "Chromium Packaging" / "signing"
+        built_sig.mkdir(parents=True)
+        (built_sig / "build_props_config.py").write_text("# generated\n")
 
+        buf = io.StringIO()
         with mock.patch.dict(os.environ,
-                             {"CHROMIUM_SRC": str(CHROMIUM_SRC)}), \
+                             {"ROAMUX_CHROMIUM_OUT": "", "CHROMIUM_OUT": ""}), \
              mock.patch.object(sign_roamux, "sign_sparkle_parts") as sp, \
              mock.patch.object(sign_roamux, "_run") as run_mock, \
              mock.patch("signing.driver._show_tool_versions"), \
              mock.patch("signing.pipeline.sign_all",
-                        new_callable=mock.AsyncMock) as sign_all:
+                        new_callable=mock.AsyncMock) as sign_all, \
+             contextlib.redirect_stdout(buf):
             rc = sign_roamux.main([
                 "--mode", "signed", "--identity", "ABCDEF",
                 "--app", str(app), "--output", str(output_dir)])
@@ -520,13 +528,17 @@ class RoamuxSignerSeamTest(unittest.TestCase):
         #     exists.
         self.assertTrue(app.exists(), "signed app was not promoted")
 
-        # seam restored; Sparkle signed first; Roamux owns the staple.
+        # seam restored; Sparkle signed first.
         self.assertIs(cf.get_class, fake_get_class, "get_class not restored")
         self.assertTrue(sp.called, "Sparkle parts not signed first")
-        self.assertTrue(
-            any("stapler" in " ".join(str(a) for a in c.args[0])
-                for c in run_mock.call_args_list),
-            "Roamux stapler staple not invoked")
+
+        # roam-97 Fix 2: notarization + stapling deferred to #90 — NO stapler
+        # runs here, and the deferral is logged.
+        run_mock.assert_not_called()  # _run only wraps codesign/stapler
+        out_text = buf.getvalue()
+        self.assertIn("#90", out_text)
+        self.assertIn("DEFERRED", out_text)
+        self.assertNotIn("stapler staple", out_text)
 
 
 class RoamuxDryRunTest(unittest.TestCase):
@@ -542,7 +554,9 @@ class RoamuxDryRunTest(unittest.TestCase):
         out = tmp / "out"
 
         buf = io.StringIO()
-        with mock.patch.object(sign_roamux, "_invoke_chromium_signer") as inv, \
+        with mock.patch.dict(os.environ,
+                             {"ROAMUX_CHROMIUM_OUT": "", "CHROMIUM_OUT": ""}), \
+             mock.patch.object(sign_roamux, "_invoke_chromium_signer") as inv, \
              mock.patch.object(sign_roamux, "sign_sparkle_parts") as sp, \
              mock.patch.object(sign_roamux, "promote_signed_app") as promote, \
              mock.patch.object(sign_roamux, "_run") as run_mock, \
@@ -604,6 +618,67 @@ class SignRoamuxCLITest(unittest.TestCase):
             ["--mode", "signed", "--identity", "X",
              "--app", "/nonexistent/Roamux.app"])
         self.assertEqual(rc, 2)
+
+
+class SignerPackageResolutionTest(unittest.TestCase):
+    """roam-97 Fix 1: the signer must import the BUILT signing package (with the
+    GN-generated build_props_config.py under `<...>/Chromium Packaging/signing/`),
+    NOT the source tree (which lacks it and fails with ModuleNotFoundError).
+    Hermetic — no checkout needed; only the resolution logic is exercised."""
+
+    def _make_built_pkg(self, root):
+        sig = root / "Chromium Packaging" / "signing"
+        sig.mkdir(parents=True)
+        (sig / "build_props_config.py").write_text("# generated\n")
+        (sig / "config_factory.py").write_text("# copied\n")
+        return str(root / "Chromium Packaging")
+
+    def test_env_out_dir_is_resolved(self):
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="roamux-pkg-"))
+        self.addCleanup(_rmtree, tmp)
+        out = tmp / "out"
+        pkg = self._make_built_pkg(out)
+        self.assertEqual(
+            sign_roamux._resolve_signing_pkg_dir(
+                str(tmp / "input"), env={"ROAMUX_CHROMIUM_OUT": str(out)}),
+            pkg)
+
+    def test_input_dir_fallback_is_resolved(self):
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="roamux-pkg-"))
+        self.addCleanup(_rmtree, tmp)
+        inp = tmp / "input"
+        pkg = self._make_built_pkg(inp)
+        self.assertEqual(
+            sign_roamux._resolve_signing_pkg_dir(str(inp), env={}), pkg)
+
+    def test_env_out_beats_input_dir(self):
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="roamux-pkg-"))
+        self.addCleanup(_rmtree, tmp)
+        out = tmp / "out"
+        env_pkg = self._make_built_pkg(out)
+        inp = tmp / "input"
+        self._make_built_pkg(inp)
+        self.assertEqual(
+            sign_roamux._resolve_signing_pkg_dir(
+                str(inp), env={"CHROMIUM_OUT": str(out)}),
+            env_pkg)
+
+    def test_source_tree_layout_is_not_picked(self):
+        # A source-like layout (signing/ WITHOUT the generated build_props_config.py)
+        # must NOT resolve — that is exactly the ModuleNotFoundError trap.
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="roamux-pkg-"))
+        self.addCleanup(_rmtree, tmp)
+        src = tmp / "input" / "Chromium Packaging" / "signing"
+        src.mkdir(parents=True)
+        (src / "config_factory.py").write_text("# copied, no build_props\n")
+        self.assertIsNone(
+            sign_roamux._resolve_signing_pkg_dir(str(tmp / "input"), env={}))
+
+    def test_degrades_cleanly_when_absent(self):
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="roamux-pkg-"))
+        self.addCleanup(_rmtree, tmp)
+        self.assertIsNone(
+            sign_roamux._resolve_signing_pkg_dir(str(tmp / "input"), env={}))
 
 
 class SigningPartsRequirementGateTest(unittest.TestCase):
