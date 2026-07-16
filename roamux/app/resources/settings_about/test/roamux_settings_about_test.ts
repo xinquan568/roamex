@@ -51,10 +51,10 @@ suite('RoamuxSettingsAbout', function() {
     // The branded logo is the settings-served Roamux asset, not the channel
     // logo theme resource.
     assertTrue(
-        (logo!.getAttribute('srcset') ?? logo!.getAttribute('src') ?? '')
+        (logo.getAttribute('srcset') ?? logo.getAttribute('src') ?? '')
             .includes('roamux_about/roamux_logo.png'));
     assertTrue(!!q('.product-title'));
-    assertEquals('Roamux', q('.product-title')!.textContent!.trim());
+    assertEquals('Roamux', q('.product-title')!.textContent.trim());
   });
 
   test('website and github links both resolve to the GitHub repo', function() {
@@ -62,7 +62,7 @@ suite('RoamuxSettingsAbout', function() {
     const github = q('#githubLink') as HTMLAnchorElement | null;
     assertTrue(!!website);
     assertTrue(!!github);
-    assertEquals(GITHUB_URL, website!.href);
-    assertEquals(GITHUB_URL, github!.href);
+    assertEquals(GITHUB_URL, website.href);
+    assertEquals(GITHUB_URL, github.href);
   });
 });
