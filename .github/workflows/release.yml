@@ -109,7 +109,11 @@ jobs:
             # Canary BEFORE the hours-long compile: the imported args must have taken effect.
             ( cd "${CHROMIUM_SRC}" && gn args "out/Release-${cpu}" --list=is_official_build --short ) | grep -qx 'is_official_build = true' \
               || { echo "::error::GN args not applied in slice ${cpu} (is_official_build != true)"; exit 1; }
-            autoninja -C "${CHROMIUM_SRC}/out/Release-${cpu}" chrome
+            # roam-97: also build the mac signing package (chrome/installer/mac:copy_signing)
+            # so <out>/Chromium Packaging/signing/ (with the GN-generated build_props_config.py
+            # that config_factory.get_class needs) exists for sign_roamux — the source tree
+            # never has it. It is arch-independent; building it per slice is harmless.
+            autoninja -C "${CHROMIUM_SRC}/out/Release-${cpu}" chrome "chrome/installer/mac:copy_signing"
             want="${cpu}"; [ "${want}" = "x64" ] && want="x86_64"
             slice_archs="$(lipo -archs "${CHROMIUM_SRC}/out/Release-${cpu}/Chromium.app/Contents/MacOS/Chromium")"
             [ "${slice_archs}" = "${want}" ] \
@@ -164,8 +168,11 @@ jobs:
           source "${RUNNER_TEMP}/roamux-signing/env.sh"
           # roam-97: Chromium's signer needs the BUILT signing package (the
           # GN-generated build_props_config.py under "<out>/Chromium Packaging/
-          # signing") — point sign_roamux at the build output dir.
-          export ROAMUX_CHROMIUM_OUT="${CHROMIUM_SRC}/out/Release"
+          # signing"). That is produced by chrome/installer/mac:copy_signing in
+          # the PER-SLICE build dirs (out/Release-<cpu>), NOT the universalized
+          # out/Release (which holds only the merged .app). It is arch-independent,
+          # so point sign_roamux at the arm64 slice's build output.
+          export ROAMUX_CHROMIUM_OUT="${CHROMIUM_SRC}/out/Release-arm64"
           # roam-97: the signer requires a separate --output DIR and leaves the
           # bare signed app at <output>/stable/Roamux.app (which sign_roamux then
           # promotes back onto ROAMUX_APP).
