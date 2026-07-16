@@ -1,13 +1,25 @@
 # SPDX-License-Identifier: Apache-2.0
-"""roam-33: rename an unbranded Chromium.app to Roamux.app for release.
+"""roam-33 / roam-97: rename an unbranded Chromium.app to Roamux.app for release.
 
 The reference build is unbranded (is_chrome_branded=false) so the product is
 Chromium.app; rather than pull Google branding surgery, the release pipeline
 renames the built bundle: the .app dir, the main executable, and the
-Info.plist CFBundleName/CFBundleExecutable/CFBundleIdentifier. Helper apps
-under Contents/Frameworks keep their Chromium names (sign_chrome re-signs
-them as-is; roam-93 confirmed the code path). Signing happens AFTER this
-rename so the seal covers the final names.
+Info.plist CFBundleName/CFBundleExecutable/CFBundleIdentifier. Helper apps and
+the inner framework under Contents/Frameworks keep their Chromium names.
+
+This is exactly the roam-97 Model-B decision, and it is intentional (not an
+oversight): `RoamuxCodeSignConfig` rebrands only the OUTER app
+(`app_product` -> "Roamux") and inherits `product` == "Chromium", so Chromium's
+`signing/config.py` derives the nested framework/helper part paths as
+"Chromium Framework.framework"/"Chromium Helper*.app" — matching precisely what
+this script leaves on disk (roam-93 confirmed the re-sign code path). Keeping
+the nested Chromium names avoids the Model-A surgery of renaming the inner
+framework/helpers and rewiring every @rpath/@executable_path load command.
+
+The output layout — a directory whose only bundle is `Roamux.app` — is what
+`sign_roamux.py` passes to Chromium's signer as `--input` (the DIRECTORY
+containing the app). Signing happens AFTER this rename so the seal covers the
+final names.
 """
 
 import argparse

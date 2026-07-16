@@ -385,6 +385,63 @@ class WorkflowInvariantsTest(unittest.TestCase):
         self.assertTrue(any("::error::rebrand gate" in l for l in lines),
                         "the rebrand gate must fail the release loudly (::error::)")
 
+    def test_release_signed_invocation_passes_input_dir_and_output(self):
+        # roam-97: sign_roamux.py signed mode now requires --output (a separate
+        # dir); Chromium's signer takes an --input DIRECTORY (sign_roamux derives
+        # it from --app's parent) and leaves the bare signed app at
+        # <output>/stable/Roamux.app. The signed release invocation must pass both
+        # --app (whose parent is the signer input dir) and --output, or it returns
+        # 2 and never reaches the fixed path.
+        text = _read("release.yml")
+        self.assertIsNotNone(text, "release.yml missing")
+        # Reconstruct backslash-continued shell commands, then find the signed
+        # sign_roamux.py invocation.
+        cmds, cur = [], []
+        for line in text.splitlines():
+            s = line.strip()
+            cur.append(s)
+            if not s.endswith("\\"):
+                cmds.append(" ".join(c.rstrip("\\").strip() for c in cur))
+                cur = []
+        signed = [c for c in cmds
+                  if "sign_roamux.py" in c and "--mode signed" in c]
+        self.assertTrue(signed,
+                        "release.yml must invoke sign_roamux.py in signed mode")
+        for c in signed:
+            self.assertIn("--app", c,
+                          "signed invocation must pass --app (its parent is the "
+                          "signer --input directory)")
+            self.assertIn("--output", c,
+                          "roam-97: signed invocation must pass --output "
+                          "(Chromium's signer requires a separate output dir)")
+            self.assertIn("RUNNER_TEMP", c,
+                          "the signer --output dir should live under $RUNNER_TEMP")
+
+    def test_release_builds_and_points_at_signing_package(self):
+        # roam-97: config_factory.get_class() needs the GN-generated
+        # build_props_config.py, which lives ONLY in the built
+        # "<out>/Chromium Packaging/signing/" produced by
+        # chrome/installer/mac:copy_signing (never the source tree). The release
+        # build must (a) build that target, and (b) point ROAMUX_CHROMIUM_OUT at
+        # a PER-SLICE build dir (out/Release-<cpu>) that actually contains it —
+        # NOT the universalized out/Release, which holds only the merged .app.
+        text = _read("release.yml")
+        self.assertIsNotNone(text, "release.yml missing")
+        self.assertIn("chrome/installer/mac:copy_signing", text,
+                      "roam-97: the signed release build must build "
+                      "chrome/installer/mac:copy_signing so the signing package "
+                      "(build_props_config.py) exists for sign_roamux")
+        # ROAMUX_CHROMIUM_OUT must be a per-slice dir (…/out/Release-<cpu>), not
+        # the universalized …/out/Release.
+        m = re.search(r'ROAMUX_CHROMIUM_OUT="([^"]*)"', text)
+        self.assertIsNotNone(
+            m, "release.yml must export ROAMUX_CHROMIUM_OUT for the signer")
+        self.assertRegex(
+            m.group(1), r"out/Release-(arm64|x64)",
+            "roam-97: ROAMUX_CHROMIUM_OUT must point at a per-slice build dir "
+            "(out/Release-<cpu>) that contains the built Chromium Packaging, "
+            "not the universalized out/Release")
+
     def test_workflows_carry_spdx(self):
         for wf in sorted(WORKFLOWS.glob("*.yml")):
             head = "\n".join(wf.read_text().splitlines()[:3])

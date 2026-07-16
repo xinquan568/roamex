@@ -1,13 +1,25 @@
 # SPDX-License-Identifier: Apache-2.0
-"""roam-33: the Roamux extension of Chromium's mac signing config (F5).
+"""roam-33 / roam-97: the Roamux extension of Chromium's mac signing config.
 
-`RoamuxCodeSignConfig` overrides the product/bundle-id names so
-`chrome/installer/mac/sign_chrome.py` operates on the renamed Roamux.app, and
+Model B (roam-97). Chromium's `signing/config.py` couples two names:
+  * `app_product` -> the OUTER bundle: `app_dir = '{.app_product}.app'`.
+  * `product`     -> the NESTED parts: `framework_dir` and the helper apps are
+    derived as `'{0.product} Framework.framework'` / `'{0.product} Helper*.app'`.
+`RoamuxCodeSignConfig` therefore rebrands ONLY the outer app
+(`app_product` -> "Roamux", `base_bundle_id` -> "com.roamux.Roamux") and
+deliberately INHERITS `product` from the base (unbranded Chromium builds report
+`product == "Chromium"`). This is the load-bearing Model-B decision: the nested
+framework/helpers keep their on-disk "Chromium ..." names, exactly matching
+`rename_bundle.py` (which renames only the outer `.app`, executable, and
+Info.plist keys and leaves the nested Chromium helpers untouched). It avoids the
+invasive Model-A surgery of renaming the inner framework/helpers and rewiring
+every @rpath/@executable_path load command.
+
 `roamux_get_parts()` injects the Sparkle framework + its nested code into
-Chromium's parts dict BEFORE the outer app (which Chromium's pipeline signs
-last, keeping the outer seal valid). Kept import-light so it is unit-testable
-without a Chromium checkout on sys.path: the CodeSignConfig base is imported
-lazily inside the factory.
+Chromium's ordered part keys BEFORE the outer app (which Chromium's pipeline
+signs last, keeping the outer seal valid). Kept import-light so it is
+unit-testable without a Chromium checkout on sys.path: the CodeSignConfig base
+is imported lazily inside the factory.
 """
 
 import pathlib
@@ -27,14 +39,21 @@ ENTITLEMENTS_DIR = pathlib.Path(__file__).resolve().parent / "entitlements"
 
 
 def make_roamux_config_class(base_cls):
-    """Given Chromium's CodeSignConfig, return a Roamux subclass. Split out so
-    it can be unit-tested with a stub base (no Chromium checkout required)."""
+    """Given Chromium's CodeSignConfig, return a Roamux subclass (Model B).
+
+    Only the OUTER app is rebranded: `app_product` -> "Roamux" and
+    `base_bundle_id` -> "com.roamux.Roamux". `product` is intentionally NOT
+    overridden — it is inherited from `base_cls` (unbranded Chromium builds
+    report "Chromium"), so `config.framework_dir` and the helper-app part paths
+    resolve to the nested "Chromium ..." bundles that `rename_bundle.py` leaves
+    on disk. Split out so it can be unit-tested with a stub base (no Chromium
+    checkout required)."""
 
     class RoamuxCodeSignConfig(base_cls):
-        @property
-        def product(self):
-            return "Roamux"
-
+        # NOTE (Model B): do NOT override `product`. Overriding it to "Roamux"
+        # would make get_parts() look for a nonexistent "Roamux Framework.
+        # framework"/"Roamux Helper*.app" (the nested parts keep Chromium
+        # names). Only `app_product` (outer app) rebrands.
         @property
         def app_product(self):
             return "Roamux"

@@ -74,6 +74,15 @@ class Tier2JobScriptTest(unittest.TestCase):
         self.assertIn("test_rebrand_strings", self.code)
         self.assertIn('ROAMUX_CHROMIUM_SRC="${SRC}"', self.code)
 
+    def test_signing_parts_gate_runs_fail_not_skip(self):
+        # roam-97: the signed-release parts-path + config-seam tests exercise
+        # Chromium's real signing package and SKIP on tier-1 (no checkout). Tier-2
+        # HAS the checkout, so it must run them fail-not-skip
+        # (REQUIRE_SIGNING_PARTS=1) against the base's signing package, from the
+        # overlay root so the dotted test module resolves.
+        self.assertIn("REQUIRE_SIGNING_PARTS=1", self.code)
+        self.assertIn("test_release_signing", self.code)
+
 
 if __name__ == "__main__":
     unittest.main()

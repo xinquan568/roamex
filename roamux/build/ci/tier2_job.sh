@@ -36,6 +36,16 @@ python3 "${GITHUB_WORKSPACE}/roamux/build/apply_patches.py" --chromium-src "${SR
 ( cd "${GITHUB_WORKSPACE}" && REQUIRE_GRIT=1 ROAMUX_CHROMIUM_SRC="${SRC}" \
     python3 -m unittest roamux.build.tests.test_rebrand_strings )
 
+# roam-97: the signed-release parts-path + config-seam tests exercise Chromium's
+# real signing package (chrome/installer/mac/signing). Tier-1 CI (no checkout)
+# SKIPS them, but that is where the load-bearing "Chromium get_parts() paths
+# resolve against the post-rename bundle" and "the Roamux config actually reaches
+# the pipeline" assertions live. This runner HAS the checkout, so run them
+# fail-not-skip (REQUIRE_SIGNING_PARTS=1 turns a skip into a failure). Hermetic
+# (tmp fixtures; no real codesign/notarize) — imports ${SRC} read-only.
+( cd "${GITHUB_WORKSPACE}" && REQUIRE_SIGNING_PARTS=1 ROAMUX_CHROMIUM_SRC="${SRC}" \
+    python3 -m unittest roamux.build.tests.test_release_signing )
+
 # Warm CI build dir: APFS-clone the operator's warm out/Default on first use (copy-on-write).
 cd "${SRC}"
 if [ ! -d "${OUT}" ]; then
