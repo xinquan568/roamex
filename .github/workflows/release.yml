@@ -63,6 +63,15 @@ jobs:
       - name: Checkout overlay
         uses: actions/checkout@v4
 
+      # roam-156: fail before any build work if the tag disagrees with the checked-in
+      # marketing version. roamux/build/VERSION is the source of truth (it is compiled
+      # in and rides the appcast); the tag must name the same version, or the release
+      # would ship a binary whose About page and update dialog contradict each other.
+      # Deliberately the first step after checkout — everything below it (Sparkle,
+      # signing, the universal2 build) is expensive and pointless if this fails.
+      - name: Assert tag matches roamux/build/VERSION
+        run: python3 roamux/build/release_version.py --check-tag "${GITHUB_REF_NAME}"
+
       - name: Vendor Sparkle (pinned + hash-verified)
         run: python3 roamux/build/fetch_sparkle.py
 
@@ -231,7 +240,13 @@ jobs:
           # roam-141: sparkle:version = the numeric (Sparkle-orderable) encoding, matching the
           # stamped CFBundleVersion; shortVersionString = the human tag string for the dialog.
           appcast_ver="$(python3 roamux/build/release_version.py --tag "${TAG}" --field bundle)"
-          appcast_short="$(python3 roamux/build/release_version.py --tag "${TAG}" --field short)"
+          # roam-156: shortVersionString comes from roamux/build/VERSION, not the tag, so
+          # the string Sparkle shows is the same one compiled into the binary rather than
+          # merely equal to it. (The `Assert tag matches` gate above already proves tag ==
+          # VERSION, so this is not a behaviour change — it makes the property structural
+          # instead of gate-dependent.) appcast_ver stays tag-derived: the numeric
+          # Sparkle-orderable encoding (roam-141) is legitimately a function of the tag.
+          appcast_short="$(python3 roamux/build/release_version.py --field source)"
           python3 roamux/app/appcast/generate_appcast.py             --version "${appcast_ver}" --short-version "${appcast_short}" --enclosure-url "$url"             --artifact "$rel/Roamux.zip" --ed-signature "$ZIP_SIG"             --pub-date "$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"             --out "$rel/appcast.xml"
           rm -f "$keyfile"
 

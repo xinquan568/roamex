@@ -1,6 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
 # Additive //roamux/common — shared helpers (features, prefs). No upstream edit (plan §12.2).
 
+import("//build/util/process_version.gni")
+
+# roam-156: compile the Roamux marketing version in from roamux/build/VERSION.
+# Reuses upstream's process_version() template — the same one chrome/common uses to
+# turn chrome/VERSION into chrome_version.h — so this adds ZERO upstream patch surface:
+# an upstream mechanism is instantiated, not an upstream file edited.
+process_version("version_header") {
+  sources = [ "//roamux/build/VERSION" ]
+  template_file = "roamux_version.h.in"
+  output = "$target_gen_dir/roamux_version.h"
+}
+
 source_set("common") {
   sources = [
     "roamux_features.cc",

@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+// Generated from roamux/build/VERSION by //roamux/common:version_header
+// (process_version). Do not edit the generated header — edit VERSION.
+//
+// roam-156: the Roamux marketing version, compiled in. Distinct from the Chromium
+// version (version_info::GetVersionNumber(), e.g. 149.0.7827.201) — that identifies
+// the upstream base this overlay is pinned to, not the product. Before roam-156 only
+// the Chromium version existed at runtime, so surfaces that wanted to name the product
+// version fell back to it and reported the wrong thing.
+//
+// Deliberately NOT Sparkle-gated: the product version is a product fact, not update
+// machinery. Gate the display, not the data.
+
+#ifndef ROAMUX_COMMON_ROAMUX_VERSION_H_
+#define ROAMUX_COMMON_ROAMUX_VERSION_H_
+
+// The marketing version as checked into roamux/build/VERSION, e.g. "0.0.1-alpha.6".
+// Stored and emitted verbatim: release_version.py parses this same string with the
+// grammar that also accepts stage-less finals ("0.0.2"), so the compiled-in value and
+// the appcast's sparkle:shortVersionString are the same string by construction.
+#define ROAMUX_VERSION_STRING "@ROAMUX_VERSION@"
+
+#endif  // ROAMUX_COMMON_ROAMUX_VERSION_H_

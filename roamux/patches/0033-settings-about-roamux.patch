@@ -47,6 +47,19 @@ diff --git a/chrome/browser/resources/settings/about_page/about_page.html b/chro
        <div class="cr-row two-line">
          <!-- Set the icon from the iconset (when it's obsolete/EOL and
            when update is done) or set the src (when it's updating). -->
+@@ -94,7 +121,12 @@
+             </a>
+           </span>
+ </if>
+           <div class="secondary">$i18n{aboutBrowserVersion}</div>
++          <!-- roam-156: the upstream Chromium base, on its own line. It cannot
++            share aboutBrowserVersion's div — that renders as one string. -->
++          <template is="dom-if" if="[[roamuxBrandedAbout_]]">
++            <div class="secondary">$i18n{aboutChromiumVersion}</div>
++          </template>
+         </div>
+ <if expr="not is_chromeos">
+         <div class="separator" hidden="[[!showButtonContainer_]]"></div>
 diff --git a/chrome/browser/resources/settings/about_page/about_page.ts b/chrome/browser/resources/settings/about_page/about_page.ts
 --- a/chrome/browser/resources/settings/about_page/about_page.ts
 +++ b/chrome/browser/resources/settings/about_page/about_page.ts
@@ -120,7 +133,7 @@ diff --git a/chrome/browser/ui/webui/settings/settings_ui.h b/chrome/browser/ui/
 diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui/webui/settings/settings_ui.cc
 --- a/chrome/browser/ui/webui/settings/settings_ui.cc
 +++ b/chrome/browser/ui/webui/settings/settings_ui.cc
-@@ -60,6 +60,15 @@
+@@ -60,6 +60,24 @@
  #include "chrome/browser/ui/webui/plural_string_handler.h"
  #include "chrome/browser/ui/webui/sanitized_image/sanitized_image_source.h"
  #include "chrome/browser/ui/webui/settings/about_handler.h"
@@ -128,6 +141,15 @@ diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui
 +// the update-page Mojo binder (Sparkle-gated).
 +#include "components/version_info/version_info.h"
 +#include "roamux/app/app_buildflags.h"
++// roam-156: the About page's version lines — "Roamux <marketing version>
++// (Developer Build) (arm64)" over "Chromium: <upstream version>". The marketing
++// version is compiled in from roamux/build/VERSION; VersionUI supplies the arch
++// segment and IDS_VERSION_UI_UNOFFICIAL the build-type label.
++#include "base/strings/strcat.h"
++#include "chrome/browser/ui/webui/version/version_ui.h"
++#include "components/strings/grit/components_strings.h"
++#include "roamux/common/roamux_version.h"
++#include "ui/base/l10n/l10n_util.h"
 +#if BUILDFLAG(ROAMUX_ENABLE_SPARKLE)
 +#include "roamux/browser/updates/roamux_update_service.h"
 +#include "roamux/browser/updates/roamux_update_service_factory.h"
@@ -136,7 +158,7 @@ diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui
  #include "chrome/browser/ui/webui/settings/accessibility_main_handler.h"
  #include "chrome/browser/ui/webui/settings/appearance_handler.h"
  #if BUILDFLAG(IS_MAC)
-@@ -499,6 +508,36 @@
+@@ -499,6 +517,64 @@
    AddLocalizedStrings(html_source, profile, web_ui->GetWebContents());
    AddSecurityData(html_source);
  
@@ -157,10 +179,38 @@ diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui
 +      nullptr;
 +#endif
 +  html_source->AddBoolean("updatesAvailable", roamux_updates_available);
++  // roam-156: `productName`, `version` and `aboutChromiumVersion` are keys the
++  // SERVED html references ($i18n{...} in settings_menu.html / about_page.html).
++  // Template substitution runs over the whole file at serve time and CHECKs on a
++  // missing key — dom-if gates rendering, not substitution — so these must be
++  // registered in EVERY build shape, including flag-off. Gate the value, not the
++  // key. (aboutBrowserVersion is exempt: upstream's AddLocalizedStrings already
++  // registers it, so we only override it, below.)
 +  html_source->AddString("productName", "Roamux");
-+  html_source->AddString("version",
-+                         std::string(version_info::GetVersionNumber()));
++  // The ROAMUX marketing version (0.0.1-alpha.6), not the Chromium version this
++  // overlay is pinned to. Feeds the left-nav About chip; rendering
++  // GetVersionNumber() here is what produced "About Roamux149.0.7827.201".
++  html_source->AddString("version", ROAMUX_VERSION_STRING);
++  // Second line of the About version block: the upstream base. It cannot share
++  // aboutBrowserVersion's <div class="secondary"> — that renders as one string —
++  // so about_page.html gives it its own div, gated on roamuxBrandedAbout.
++  html_source->AddString(
++      "aboutChromiumVersion",
++      base::StrCat({"Chromium: ", version_info::GetVersionNumber()}));
 +#if BUILDFLAG(ROAMUX_ENABLE_SPARKLE)
++  // roam-156: composed, not IDS_SETTINGS_ABOUT_PAGE_BROWSER_VERSION — that
++  // string hardcodes a "Version " prefix, and we want "Roamux <v>". Build type
++  // is forced to IDS_VERSION_UI_UNOFFICIAL ("Developer Build"): these are
++  // unsigned personal alphas, and is_official_build is a compiler-optimization
++  // switch, not a labeling switch, so the honest label has to move here.
++  // Overrides an upstream-registered key, so it is safe to gate: flag-off keeps
++  // upstream's "Version <chromium>" line verbatim.
++  html_source->AddString(
++      "aboutBrowserVersion",
++      base::StrCat({"Roamux ", ROAMUX_VERSION_STRING, " (",
++                    l10n_util::GetStringUTF8(IDS_VERSION_UI_UNOFFICIAL), ") ",
++                    l10n_util::GetStringUTF8(
++                        VersionUI::VersionProcessorVariation())}));
 +  html_source->AddString("aboutProductTitle", "Roamux");
 +  html_source->AddString("aboutProductCopyright",
 +                         "Copyright 2026 The Roamux Authors. All rights "
@@ -173,7 +223,7 @@ diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui
    ManagedUIHandler::Initialize(web_ui, html_source);
  
    content::URLDataSource::Add(
-@@ -881,6 +920,22 @@
+@@ -881,6 +957,22 @@
        std::move(pending_receiver));
  }
  
@@ -230,7 +280,7 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
  import("//chrome/common/features.gni")
  import("//components/captive_portal/core/features.gni")
  import("//components/compose/features.gni")
-@@ -5715,6 +5716,22 @@
+@@ -5714,6 +5715,28 @@
      "//roamux/browser/tab_visit/tab_visit_command.cc",
      "//roamux/browser/tab_visit/tab_visit_command.h",
    ]
@@ -240,6 +290,12 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 +  # BUILDFLAG(ROAMUX_ENABLE_SPARKLE)), so its generator is an unconditional dep
 +  # — a clean build must not compile settings_ui before the header exists.
 +  deps += [ "//roamux/app:app_buildflags" ]
++
++  # Roamux (roam-156): settings_ui.cc includes the generated
++  # roamux/common/roamux_version.h for ROAMUX_VERSION_STRING. Same reasoning as
++  # app_buildflags above — the include is unconditional, so the generator must be
++  # an unconditional dep or a clean build races it.
++  deps += [ "//roamux/common:version_header" ]
 +
 +  # SettingsUI::BindInterface delegates the settings/help update-page factory to
 +  # the per-profile RoamuxUpdateService. Sparkle-gated to match settings_ui.cc;
