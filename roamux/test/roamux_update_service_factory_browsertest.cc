@@ -69,10 +69,18 @@ IN_PROC_BROWSER_TEST_F(RoamuxUpdateServiceFactoryBrowserTest,
       browser()->tab_strip_model()->GetActiveWebContents();
   ASSERT_TRUE(wc);
   EXPECT_EQ(GURL("chrome://settings/help"), wc->GetLastCommittedURL());
-  EXPECT_EQ(true,
-            content::EvalJs(wc, "loadTimeData.getBoolean('updatesAvailable')"));
-  EXPECT_EQ(true,
-            content::EvalJs(wc, "loadTimeData.getBoolean('roamuxBrandedAbout')"));
+  // roam-154: chrome://settings is module-based in M149 — loadTimeData is a
+  // module export, not a window global — so read it via a dynamic import of the
+  // settings bundle (the same singleton the page uses). EvalJs awaits the
+  // returned promise.
+  EXPECT_EQ(true, content::EvalJs(
+                      wc,
+                      "import('chrome://settings/settings.js').then("
+                      "m => m.loadTimeData.getBoolean('updatesAvailable'))"));
+  EXPECT_EQ(true, content::EvalJs(
+                      wc,
+                      "import('chrome://settings/settings.js').then("
+                      "m => m.loadTimeData.getBoolean('roamuxBrandedAbout'))"));
 }
 
 }  // namespace
