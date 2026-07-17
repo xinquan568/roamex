@@ -21,6 +21,7 @@ Usage: check_settings_logo.py --assets-dir <settings_about dir> [--json]
 import argparse
 import json
 import pathlib
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -77,14 +78,40 @@ def _check_common(root, errors, name):
 
 def _check_glyph(root, errors):
     _check_common(root, errors, GLYPH)
-    # A luminance mask cuts the transparent centre hole; without it the glyph has no negative space.
-    masks = _findall(root, "mask")
+    # The transparent centre hole is cut by a luminance mask, and the visible rays must
+    # actually reference it — a mask that nothing consumes cuts no hole. Validate the
+    # concrete contract, not merely "some mask exists", so a degenerate/unused mask fails.
+    masks = {m.get("id"): m for m in _findall(root, "mask")}
     if not masks:
         errors.append(f"{GLYPH}: no <mask> — the transparent centre hole would be missing")
+        return
+    # The ray group must reference a mask by url(#id).
+    referenced = None
+    for g in _findall(root, "g") + _findall(root, "line"):
+        ref = g.get("mask", "")
+        m = re.match(r"url\(#(.+)\)", ref)
+        if m and m.group(1) in masks:
+            referenced = masks[m.group(1)]
+            break
+    if referenced is None:
+        errors.append(f"{GLYPH}: no visible element references a <mask> via url(#id) — "
+                      f"the mask cuts nothing")
+        return
+    # White full-size field + black r=72 knockout at the icon centre (matches the app
+    # icon's white-disc negative space).
+    field = [r for r in _findall(referenced, "rect")
+             if (r.get("fill") or "").upper() == "#FFFFFF"]
+    if not field:
+        errors.append(f"{GLYPH}: mask has no white field <rect> — nothing would be visible")
+    hole = [c for c in _findall(referenced, "circle")
+            if (c.get("fill") or "").upper() == "#000000"]
+    if not hole:
+        errors.append(f"{GLYPH}: mask has no black <circle> centre knockout")
     else:
-        has_hole = any(_findall(m, "circle") for m in masks)
-        if not has_hole:
-            errors.append(f"{GLYPH}: <mask> has no <circle> centre knockout")
+        c = hole[0]
+        if not (c.get("cx") == "256" and c.get("cy") == "256" and c.get("r") == "72"):
+            errors.append(f"{GLYPH}: mask knockout is not the expected r=72 circle at 256,256 "
+                          f"(got cx={c.get('cx')} cy={c.get('cy')} r={c.get('r')})")
     # The glyph must NOT carry the tile: no white background rect, no drop-shadow filter. Skip rects
     # inside the <mask> — the luminance mask's white field is legitimate machinery, not a tile.
     masked = _masked_elements(root)
