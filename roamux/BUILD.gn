@@ -152,6 +152,14 @@ test("roamux_browser_unittests") {
     "//testing/gtest",
     "//third_party/metrics_proto",
   ]
+
+  # roam-150: test_support links the Sparkle-backed update service when
+  # roamux_enable_sparkle is on, so this executable needs the rpath to load the
+  # vendored Sparkle.framework at launch (the app gets it from patch 0030;
+  # sparkle_link cannot carry ldflags — see the roam-121 note in app/BUILD.gn).
+  if (roamux_enable_sparkle) {
+    configs += [ "//roamux/app:sparkle_test_rpath" ]
+  }
 }
 
 # Settings-surface DOM tests (roam-6 WB-T4) — the overlay's browser_tests-style target: full
@@ -232,5 +240,9 @@ test("roamux_browsertests") {
   if (roamux_enable_sparkle) {
     sources += [ "test/roamux_update_service_factory_browsertest.cc" ]
     deps += [ "//roamux/browser/updates:update_service" ]
+
+    # roam-150: same as roamux_browser_unittests — the linked Sparkle framework
+    # needs an rpath so the test executable resolves it at launch.
+    configs += [ "//roamux/app:sparkle_test_rpath" ]
   }
 }
