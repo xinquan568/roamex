@@ -1,7 +1,7 @@
 diff --git a/chrome/browser/resources/settings/about_page/about_page.html b/chrome/browser/resources/settings/about_page/about_page.html
 --- a/chrome/browser/resources/settings/about_page/about_page.html
 +++ b/chrome/browser/resources/settings/about_page/about_page.html
-@@ -47,13 +47,40 @@
+@@ -47,13 +47,43 @@
      </style>
      <settings-section page-title="$i18n{aboutPageTitle}">
        <div class="cr-row two-line first">
@@ -13,7 +13,10 @@ diff --git a/chrome/browser/resources/settings/about_page/about_page.html b/chro
 +        <!-- roam-140: the branded Roamux logo (settings-served asset) or the
 +          native channel logo, gated by roamuxBrandedAbout. -->
 +        <template is="dom-if" if="[[roamuxBrandedAbout_]]">
-+          <img id="product-logo" class="roamux-logo"
++          <!-- roam-167: 48x48 — roamux_logo.svg is 512x512 intrinsic and the
++            upstream #product-logo has no size rule (it assumed a 32px channel
++            PNG), so without this the tile fills the whole card. -->
++          <img id="product-logo" class="roamux-logo" width="48" height="48"
 +              src="chrome://settings/roamux_about/roamux_logo.svg"
 +              alt="$i18n{aboutProductLogoAlt}" role="presentation">
 +        </template>
@@ -47,7 +50,7 @@ diff --git a/chrome/browser/resources/settings/about_page/about_page.html b/chro
        <div class="cr-row two-line">
          <!-- Set the icon from the iconset (when it's obsolete/EOL and
            when update is done) or set the src (when it's updating). -->
-@@ -94,7 +121,12 @@
+@@ -94,7 +124,12 @@
              </a>
            </span>
  </if>
@@ -158,7 +161,7 @@ diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui
  #include "chrome/browser/ui/webui/settings/accessibility_main_handler.h"
  #include "chrome/browser/ui/webui/settings/appearance_handler.h"
  #if BUILDFLAG(IS_MAC)
-@@ -499,6 +517,64 @@
+@@ -499,6 +517,69 @@
    AddLocalizedStrings(html_source, profile, web_ui->GetWebContents());
    AddSecurityData(html_source);
  
@@ -211,6 +214,11 @@ diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui
 +                    l10n_util::GetStringUTF8(IDS_VERSION_UI_UNOFFICIAL), ") ",
 +                    l10n_util::GetStringUTF8(
 +                        VersionUI::VersionProcessorVariation())}));
++  // roam-167: the About section header + left-nav chip both render
++  // $i18n{aboutPageTitle} (IDS_SETTINGS_ABOUT_PROGRAM = "About Chromium").
++  // Override it deterministically instead of relying on the E9 GRIT rebrand,
++  // which only runs in release builds — so dev builds showed "About Chromium".
++  html_source->AddString("aboutPageTitle", "About Roamux");
 +  html_source->AddString("aboutProductTitle", "Roamux");
 +  html_source->AddString("aboutProductCopyright",
 +                         "Copyright 2026 The Roamux Authors. All rights "
@@ -223,7 +231,7 @@ diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui
    ManagedUIHandler::Initialize(web_ui, html_source);
  
    content::URLDataSource::Add(
-@@ -881,6 +957,22 @@
+@@ -881,6 +962,22 @@
        std::move(pending_receiver));
  }
  
