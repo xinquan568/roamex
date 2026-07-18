@@ -111,7 +111,3 @@ TEST(UpdateStateMachineTest, ProgressIsClampedToUnitRange) {
 
 }  // namespace
 }  // namespace roamux::updates
-
-
-}  // namespace
-}  // namespace roamux::updates
