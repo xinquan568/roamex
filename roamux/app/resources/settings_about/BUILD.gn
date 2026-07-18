@@ -17,7 +17,10 @@ build_webui("resources") {
   generate_grdp = true
   grd_resource_path_prefix = "roamux_about"
 
-  static_files = [ "roamux_logo.png" ]
+  static_files = [
+    "roamux_logo.svg",
+    "roamux_glyph.svg",
+  ]
 
   ts_files = [
     "roamux_update_card.ts",

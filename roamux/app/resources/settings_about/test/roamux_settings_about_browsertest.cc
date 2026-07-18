@@ -36,6 +36,13 @@ class RoamuxSettingsAboutBrowserTest : public WebUIMochaBrowserTest {
                                test_case.c_str()));
   }
 
+  // roam-157: the settings left-nav About chip (settings-menu element).
+  void RunMenuTestCase(const std::string& test_case) {
+    RunTest("roamux_settings_about/roamux_settings_menu_test.js",
+            base::StringPrintf("runMochaTest('RoamuxSettingsMenu', '%s');",
+                               test_case.c_str()));
+  }
+
  private:
   base::test::ScopedFeatureList webui_toolbar_disables_;
 };
@@ -78,4 +85,25 @@ IN_PROC_BROWSER_TEST_F(RoamuxSettingsAboutBrowserTest, BrandedLogoAndTitle) {
 
 IN_PROC_BROWSER_TEST_F(RoamuxSettingsAboutBrowserTest, LinksResolveToGitHub) {
   RunAboutTestCase("website and github links both resolve to the GitHub repo");
+}
+
+// roam-156 left this mocha case without a C++ runner, so it never executed. roam-157
+// touches the same About surface (hero logo -> .svg); wire it in while here.
+IN_PROC_BROWSER_TEST_F(RoamuxSettingsAboutBrowserTest, AboutVersionLines) {
+  RunAboutTestCase("version lines name Roamux and Chromium separately");
+}
+
+
+// --- settings nav About chip suite (roam-157) ---
+
+IN_PROC_BROWSER_TEST_F(RoamuxSettingsAboutBrowserTest, MenuChipGlyph) {
+  RunMenuTestCase("about chip shows the roamux glyph");
+}
+
+IN_PROC_BROWSER_TEST_F(RoamuxSettingsAboutBrowserTest, MenuChipTwoLines) {
+  RunMenuTestCase("about chip renders two lines: title over v-version");
+}
+
+IN_PROC_BROWSER_TEST_F(RoamuxSettingsAboutBrowserTest, MenuChipSiblingsSingleLine) {
+  RunMenuTestCase("other nav items keep a single line");
 }

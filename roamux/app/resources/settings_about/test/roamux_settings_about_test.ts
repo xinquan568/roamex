@@ -58,7 +58,7 @@ suite('RoamuxSettingsAbout', function() {
     // logo theme resource.
     assertTrue(
         (logo.getAttribute('srcset') ?? logo.getAttribute('src') ?? '')
-            .includes('roamux_about/roamux_logo.png'));
+            .includes('roamux_about/roamux_logo.svg'));
     assertTrue(!!q('.product-title'));
     assertEquals('Roamux', q('.product-title')!.textContent.trim());
   });

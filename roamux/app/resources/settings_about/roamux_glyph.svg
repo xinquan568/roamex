@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Roamux</title>
+  <!--
+    roam-157: the inline Roamux glyph — the four Google-palette rays from the app icon
+    (icon-bold.svg), WITHOUT the white tile, border, or drop shadow. Used at small sizes
+    (settings nav chip) where a white tile would be near-invisible on a light theme.
+    Fixed colours → identical in light and dark. The transparent centre is cut by a
+    luminance mask (white field passes the rays; the black r=72 circle knocks a hole),
+    reproducing the app icon's negative-space centre on any background.
+  -->
+  <mask id="roamuxGlyphHole" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512" mask-type="luminance">
+    <rect x="0" y="0" width="512" height="512" fill="#FFFFFF"/>
+    <circle cx="256" cy="256" r="72" fill="#000000"/>
+  </mask>
+  <g mask="url(#roamuxGlyphHole)" fill="none" stroke-linecap="round" stroke-width="90.608">
+    <line x1="219.230" y1="219.230" x2="107.508" y2="107.508" stroke="#EA4335"/>
+    <line x1="292.770" y1="219.230" x2="404.492" y2="107.508" stroke="#FBBC05"/>
+    <line x1="292.770" y1="292.770" x2="404.492" y2="404.492" stroke="#34A853"/>
+    <line x1="219.230" y1="292.770" x2="107.508" y2="404.492" stroke="#4285F4"/>
+  </g>
+</svg>

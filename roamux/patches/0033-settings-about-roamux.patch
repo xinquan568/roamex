@@ -14,7 +14,7 @@ diff --git a/chrome/browser/resources/settings/about_page/about_page.html b/chro
 +          native channel logo, gated by roamuxBrandedAbout. -->
 +        <template is="dom-if" if="[[roamuxBrandedAbout_]]">
 +          <img id="product-logo" class="roamux-logo"
-+              src="chrome://settings/roamux_about/roamux_logo.png"
++              src="chrome://settings/roamux_about/roamux_logo.svg"
 +              alt="$i18n{aboutProductLogoAlt}" role="presentation">
 +        </template>
 +        <template is="dom-if" if="[[!roamuxBrandedAbout_]]">

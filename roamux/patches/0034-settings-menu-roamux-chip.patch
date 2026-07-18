@@ -1,32 +1,63 @@
 diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
+index 3cb9e3a..5b079f5 100644
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
-@@ -167,8 +167,20 @@
+@@ -39,6 +39,25 @@
+           border-bottom: var(--cr-separator-line);  /* override */
+         }
+       }
++      /* roam-157: the branded About entry is a two-line chip (glyph + title +
++         version). Scoped to #about-menu so the shared single-line .cr-nav-menu-item
++         rows keep their height/alignment. The 20px logo margin matches the spacing the
++         shared style gives cr-icon/iron-icon, so the glyph aligns with every nav icon. */
++      #about-menu #roamuxMenuLogo {
++        flex-shrink: 0;
++        margin-inline-end: 20px;
++      }
++      #about-menu #roamuxMenuText {
++        display: flex;
++        flex-direction: column;
++        justify-content: center;
++        line-height: 1.35;
++      }
++      #about-menu #roamuxMenuVersion {
++        color: var(--cr-secondary-text-color);
++        font-size: 11px;
++        font-weight: 400;
++      }
+     </style>
+ 
+     <div role="navigation">
+@@ -167,8 +186,22 @@
          </a>
          <a role="menuitem" id="about-menu" href="/help"
              class="cr-nav-menu-item">
 -          <cr-icon icon="cr:chrome-product"></cr-icon>
-+          <!-- roam-140: the Roamux logo + version chip, gated by
-+            roamuxBrandedAbout; the native product icon otherwise. -->
+-          $i18n{aboutPageTitle}
++          <!-- roam-157 (was roam-140): the branded About entry is a two-line chip —
++            the Roamux glyph + "About Roamux" over "v <version>". The native product
++            icon + single-line title otherwise. Gated by roamuxBrandedAbout. -->
 +          <template is="dom-if" if="[[roamuxBrandedAbout_]]">
 +            <img id="roamuxMenuLogo"
-+                src="chrome://settings/roamux_about/roamux_logo.png"
++                src="chrome://settings/roamux_about/roamux_glyph.svg"
 +                width="20" height="20" alt="" aria-hidden="true">
++            <div id="roamuxMenuText">
++              <span id="roamuxMenuTitle">$i18n{aboutPageTitle}</span>
++              <span id="roamuxMenuVersion">v $i18n{version}</span>
++            </div>
 +          </template>
 +          <template is="dom-if" if="[[!roamuxBrandedAbout_]]">
 +            <cr-icon icon="cr:chrome-product"></cr-icon>
-+          </template>
-           $i18n{aboutPageTitle}
-+          <template is="dom-if" if="[[roamuxBrandedAbout_]]">
-+            <span id="roamuxMenuVersion">$i18n{version}</span>
++            $i18n{aboutPageTitle}
 +          </template>
            <cr-ripple></cr-ripple>
          </a>
        </cr-menu-selector>
 diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.ts b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
+index eb319ae..bc1b6d0 100644
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.ts
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
-@@ -76,12 +76,19 @@
+@@ -76,12 +76,19 @@ export class SettingsMenuElement extends SettingsMenuElementBase {
            return loadTimeData.getBoolean('enableYourSavedInfoSettingsPage');
          },
        },
