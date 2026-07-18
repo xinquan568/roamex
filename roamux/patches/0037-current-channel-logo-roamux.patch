@@ -1,0 +1,73 @@
+diff --git a/chrome/browser/ui/webui/BUILD.gn b/chrome/browser/ui/webui/BUILD.gn
+index fa8bdb024f..b8eb078624 100644
+--- a/chrome/browser/ui/webui/BUILD.gn
++++ b/chrome/browser/ui/webui/BUILD.gn
+@@ -178,6 +178,7 @@ source_set("webui") {
+     ":webui_url_hashes",
+     "//chrome/common",
+     "//extensions/buildflags",
++    "//roamux/app/resources/theme:roamux_theme_resources",
+   ]
+   if (enable_extensions_core) {
+     deps += [ "//chrome/browser/extensions" ]
+diff --git a/chrome/browser/ui/webui/current_channel_logo.cc b/chrome/browser/ui/webui/current_channel_logo.cc
+index 70f983e5c6..ed1a3dbf7f 100644
+--- a/chrome/browser/ui/webui/current_channel_logo.cc
++++ b/chrome/browser/ui/webui/current_channel_logo.cc
+@@ -10,6 +10,7 @@
+ #include "build/branding_buildflags.h"
+ #include "chrome/common/channel_info.h"
+ #include "chrome/grit/theme_resources.h"
++#include "roamux/grit/roamux_theme_resources.h"
+ 
+ namespace webui {
+ 
+@@ -33,7 +34,11 @@ int CurrentChannelLogoResourceId() {
+       [[fallthrough]];
+ #endif
+     case version_info::Channel::UNKNOWN:
+-      return IDR_PRODUCT_LOGO_32;
++      // Roamux (roam-158): every current-channel-logo surface (settings
++      // toolbar, chrome://version, the settings drawer, management/extensions
++      // banners) shows the Roamux mark. Unbranded builds reach this arm on
++      // all channels via the CHECK_IS_TEST fallthrough above.
++      return IDR_ROAMUX_PRODUCT_LOGO_32;
+   }
+   return -1;
+ }
+diff --git a/chrome/chrome_paks.gni b/chrome/chrome_paks.gni
+index a6db77c726..8f09b80abb 100644
+--- a/chrome/chrome_paks.gni
++++ b/chrome/chrome_paks.gni
+@@ -42,6 +42,7 @@ template("chrome_repack_percent") {
+       "$root_gen_dir/chrome/renderer_resources_${percent}_percent.pak",
+       "$root_gen_dir/chrome/theme_resources_${percent}_percent.pak",
+       "$root_gen_dir/components/components_resources_${percent}_percent.pak",
++      "$root_gen_dir/roamux/roamux_theme_resources_${percent}_percent.pak",
+       "$root_gen_dir/third_party/blink/public/resources/blink_scaled_resources_${percent}_percent.pak",
+       "$root_gen_dir/ui/resources/ui_resources_${percent}_percent.pak",
+     ]
+@@ -52,6 +53,7 @@ template("chrome_repack_percent") {
+       "//components/resources",
+       "//components/strings",
+       "//net:net_resources",
++      "//roamux/app/resources/theme:roamux_theme_resources",
+       "//third_party/blink/public:scaled_resources_${percent}_percent",
+       "//ui/resources",
+     ]
+diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
+index 9d69921f81..8566a09e77 100644
+--- a/tools/gritsettings/resource_ids.spec
++++ b/tools/gritsettings/resource_ids.spec
+@@ -1738,6 +1738,11 @@
+     "messages": [10120],
+   },
+ 
++  # Roamux overlay (symlinked at src/roamux; patch 0037, roam-158).
++  "roamux/app/resources/theme/roamux_theme_resources.grd": {
++    "structures": [10140],
++  },
++
+   "<(SHARED_INTERMEDIATE_DIR)/THIS_IS_A_PLACEHOLDER.grd": {
+     "META": {"sizes": {"includes": [800]}},
+     "includes": [12000],

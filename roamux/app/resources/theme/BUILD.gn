@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# roam-158: the Roamux current-channel-logo glyph as a scaled grit resource.
+# Repacked into the per-percent resource paks by chrome_repack_percent (patch
+# 0037), consumed by the CurrentChannelLogoResourceId() repoint in
+# chrome/browser/ui/webui/current_channel_logo.cc (same patch). The rc_header
+# lands at roamux/grit/roamux_theme_resources.h via output_dir.
+import("//tools/grit/grit_rule.gni")
+
+grit("roamux_theme_resources") {
+  source = "roamux_theme_resources.grd"
+  outputs = [
+    "grit/roamux_theme_resources.h",
+    "roamux_theme_resources_100_percent.pak",
+    "roamux_theme_resources_200_percent.pak",
+    "roamux_theme_resources_300_percent.pak",
+  ]
+  output_dir = "$root_gen_dir/roamux"
+}
