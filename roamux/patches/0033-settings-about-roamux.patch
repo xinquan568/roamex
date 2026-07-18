@@ -113,10 +113,10 @@ index 5069802bf7..24bb719dac 100644
                on-click="onRelaunchClick_">
              $i18n{aboutRelaunch}
 diff --git a/chrome/browser/resources/settings/about_page/about_page.ts b/chrome/browser/resources/settings/about_page/about_page.ts
-index aa3f435d83..f855c1800d 100644
+index aa3f435d83..9570776046 100644
 --- a/chrome/browser/resources/settings/about_page/about_page.ts
 +++ b/chrome/browser/resources/settings/about_page/about_page.ts
-@@ -19,7 +19,6 @@ import 'chrome://resources/cr_elements/cr_icon/cr_icon.js';
+@@ -19,13 +19,12 @@ import 'chrome://resources/cr_elements/cr_icon/cr_icon.js';
  import 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
  import 'chrome://resources/cr_elements/icons.html.js';
  import 'chrome://resources/cr_elements/cr_shared_style.css.js';
@@ -124,6 +124,14 @@ index aa3f435d83..f855c1800d 100644
  import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
  import {WebUiListenerMixin} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
  import {assert} from 'chrome://resources/js/assert.js';
+-// <if expr="_google_chrome">
++// Roamux (roam-161): ungated — the branded help row opens the Roamux help
++// doc via OpenWindowProxy (upstream gates this import _google_chrome-only).
+ import {OpenWindowProxyImpl} from 'chrome://resources/js/open_window_proxy.js';
+-// </if>
+ import {sanitizeInnerHtml} from 'chrome://resources/js/parse_html_subset.js';
+ import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+ 
 @@ -62,6 +61,39 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
  
    static get properties() {
@@ -186,7 +194,19 @@ index aa3f435d83..f855c1800d 100644
    declare private currentUpdateStatusEvent_: UpdateStatusChangedEvent|null;
    declare private isManaged_: boolean;
    declare private managedByIcon_: string;
-@@ -219,9 +260,53 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
+@@ -215,13 +256,65 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
+   }
+ 
+   private onHelpClick_() {
++    // Roamux (roam-161): "Get help with Roamux" must open the Roamux help
++    // doc, not Google's Chrome support site (chrome::ShowHelp). New tab,
++    // preserving the row's `external` behaviour.
++    if (this.roamuxBrandedAbout_) {
++      OpenWindowProxyImpl.getInstance().openUrl(
++          'https://github.com/xinquan568/roamux/blob/main/docs/help.md');
++      return;
++    }
+     this.aboutBrowserProxy_.openHelpPage();
    }
  
    private onRelaunchClick_() {
@@ -240,7 +260,7 @@ index aa3f435d83..f855c1800d 100644
    // <if expr="not is_chromeos">
    private updateShowUpdateStatus_() {
      if (this.obsoleteSystemInfo_.endOfLine) {
-@@ -237,7 +322,11 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
+@@ -237,7 +330,11 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
     * container displays an unwanted border (see separator class).
     */
    private updateShowButtonContainer_() {
@@ -253,7 +273,7 @@ index aa3f435d83..f855c1800d 100644
    }
  
    private updateShowRelaunch_() {
-@@ -245,13 +334,25 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
+@@ -245,13 +342,25 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
    }
  
    private shouldShowLearnMoreLink_(): boolean {
@@ -281,7 +301,7 @@ index aa3f435d83..f855c1800d 100644
          return this.i18nAdvanced('aboutUpgradeCheckStarted');
        case UpdateStatus.NEARLY_UPDATED:
          return this.i18nAdvanced('aboutUpgradeRelaunch');
-@@ -276,7 +377,9 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
+@@ -276,7 +385,9 @@ export class SettingsAboutPageElement extends SettingsAboutPageElementBase
          let result = '';
          const message = this.currentUpdateStatusEvent_!.message;
          if (message) {

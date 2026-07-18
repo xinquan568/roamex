@@ -270,4 +270,24 @@ IN_PROC_BROWSER_TEST_F(RoamuxUpdateRowBrowserTest,
          " (install-on-quit), not the generic relaunch";
 }
 
+// roam-161: the "Get help with Roamux" row must open the Roamux help doc in a
+// NEW tab (pending-entry assert — no dependence on a real GitHub load), not
+// Google's Chrome support site.
+IN_PROC_BROWSER_TEST_F(RoamuxUpdateRowBrowserTest, HelpRowOpensRoamuxDocs) {
+  ui_test_utils::TabAddedWaiter tab_added(browser());
+  ASSERT_TRUE(content::ExecJs(
+      web_contents_, std::string(kPrelude) + "inAbout('#help').click();"));
+  content::WebContents* new_tab = tab_added.Wait();
+  ASSERT_NE(nullptr, new_tab);
+  // The tab is inserted before its navigation starts; poll the pending-entry
+  // (visible) URL — no dependence on the remote page actually loading.
+  const GURL expected(
+      "https://github.com/xinquan568/roamux/blob/main/docs/help.md");
+  EXPECT_TRUE(base::test::RunUntil([&]() {
+    return new_tab->GetVisibleURL() == expected;
+  })) << "the branded help row must open the Roamux help doc, not Google's"
+         " support site (visible: "
+      << new_tab->GetVisibleURL() << ")";
+}
+
 }  // namespace roamux::updates
