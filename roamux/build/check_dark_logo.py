@@ -93,18 +93,29 @@ def check_payload(payload_path):
 
 
 def _patch_file_sections(patch_text):
-    """{upstream-path: (added-lines, removed-lines)} parsed per diff file section."""
+    """{upstream-path: (added, removed, context)} parsed per diff file section.
+
+    Context lines matter: a hunk can carry an unchanged line (leading space)
+    that survives into the patched file — the sync check must see those too,
+    or an IDR reference retained as context would slip past tier-1.
+    """
     sections = {}
     current = None
+    in_hunk = False
     for line in patch_text.splitlines():
         if line.startswith("diff --git "):
             # diff --git a/<path> b/<path>
             current = line.split(" b/", 1)[-1].strip()
-            sections[current] = ([], [])
+            sections[current] = ([], [], [])
+            in_hunk = False
+        elif current and line.startswith("@@"):
+            in_hunk = True
         elif current and line.startswith("+") and not line.startswith("+++"):
             sections[current][0].append(line[1:])
         elif current and line.startswith("-") and not line.startswith("---"):
             sections[current][1].append(line[1:])
+        elif current and in_hunk and line.startswith(" "):
+            sections[current][2].append(line[1:])
     return sections
 
 
@@ -136,11 +147,13 @@ def check_patch_sync(payload_path, patch_path):
         failures.append(
             f"{patch_path}: no diff section for {UPSTREAM_VERSION_PATH}")
     else:
-        added, removed = version
-        if any("IDR_PRODUCT_LOGO" in line for line in added):
+        added, removed, context = version
+        # Added AND context lines both survive into the patched file.
+        if any("IDR_PRODUCT_LOGO" in line for line in added + context):
             failures.append(
-                f"{patch_path}: {UPSTREAM_VERSION_PATH} still adds an"
-                " IDR_PRODUCT_LOGO reference")
+                f"{patch_path}: {UPSTREAM_VERSION_PATH} leaves an"
+                " IDR_PRODUCT_LOGO reference in the patched file"
+                " (added or retained as hunk context)")
         if not any("IDR_PRODUCT_LOGO" in line for line in removed):
             failures.append(
                 f"{patch_path}: {UPSTREAM_VERSION_PATH} hunk does not remove"

@@ -19,7 +19,8 @@ _PAYLOAD = _OVERLAY / "app" / "resources" / "theme" / "chrome_logo_dark.svg"
 _PATCH = _OVERLAY / "patches" / "0038-dark-logo-roamux.patch"
 
 
-def _patch_text(svg_added_lines, version_added=None, version_removed=None):
+def _patch_text(svg_added_lines, version_added=None, version_removed=None,
+                version_context=None):
     """A minimal synthetic 0038-shaped unified diff."""
     version_added = version_added if version_added is not None else [
         '          <img alt="$i18n{logo_alt_text}"',
@@ -31,6 +32,7 @@ def _patch_text(svg_added_lines, version_added=None, version_removed=None):
         '                          chrome://theme/IDR_PRODUCT_LOGO_WHITE@2x 2x"',
         '          <img alt="$i18n{logo_alt_text}" src="chrome://theme/IDR_PRODUCT_LOGO">',
     ]
+    version_context = version_context or []
     lines = ["diff --git a/%s b/%s" % (c.UPSTREAM_SVG_PATH, c.UPSTREAM_SVG_PATH),
              "@@ -1,1 +1,%d @@" % len(svg_added_lines)]
     lines += ["-<svg>old chromium art</svg>"]
@@ -39,6 +41,7 @@ def _patch_text(svg_added_lines, version_added=None, version_removed=None):
               "@@ -30,10 +30,5 @@"]
     lines += ["-" + line for line in version_removed]
     lines += ["+" + line for line in version_added]
+    lines += [" " + line for line in version_context]
     return "\n".join(lines) + "\n"
 
 
@@ -129,7 +132,17 @@ class PatchSyncTest(unittest.TestCase):
         patch = self._patch(_patch_text(
             _PAYLOAD.read_text().splitlines(),
             version_added=['<img src="chrome://theme/IDR_PRODUCT_LOGO">']))
-        self.assertTrue(any("still adds an" in f
+        self.assertTrue(any("leaves an IDR_PRODUCT_LOGO" in f
+                            for f in c.check_patch_sync(_PAYLOAD, patch)))
+
+    def test_context_idr_reference_fails(self):
+        """An IDR reference surviving as unchanged hunk context must fail —
+        added lines alone do not tell the whole post-patch story."""
+        patch = self._patch(_patch_text(
+            _PAYLOAD.read_text().splitlines(),
+            version_context=[
+                '<img src="chrome://theme/IDR_PRODUCT_LOGO" id="legacy">']))
+        self.assertTrue(any("retained as hunk context" in f
                             for f in c.check_patch_sync(_PAYLOAD, patch)))
 
     def test_missing_current_channel_srcset_fails(self):
