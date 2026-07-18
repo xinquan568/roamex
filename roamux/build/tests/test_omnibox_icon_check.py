@@ -20,23 +20,34 @@ _PATCH = _OVERLAY / c.PATCH_REL
 
 
 def _patch_text(delegate_added=None, delegate_removed=None, extra_file=None,
-                gn_added=None):
+                gn_added=None, delegate_context=None, gn_header=None,
+                gn_context=None):
     delegate_added = delegate_added if delegate_added is not None else [
         '    return &roamux::kRoamuxProductIcon;',
     ]
     delegate_removed = delegate_removed if delegate_removed is not None else [
         '    return &omnibox::kProductChromeRefreshIcon;',
     ]
+    delegate_context = delegate_context if delegate_context is not None else [
+        '  if (url.SchemeIs(content::kChromeUIScheme)) {',
+    ]
     gn_added = gn_added if gn_added is not None else [
         '    "//roamux/browser/ui/icons",',
     ]
+    gn_header = gn_header if gn_header is not None else \
+        'source_set("toolbar") {'
+    gn_context = gn_context if gn_context is not None else [
+        '      "//components/user_education/common",',
+    ]
     lines = ["diff --git a/%s b/%s" % (c.DELEGATE_PATH, c.DELEGATE_PATH),
-             "@@ -190,3 +190,3 @@"]
+             "@@ -190,7 +191,9 @@ const gfx::VectorIcon* "
+             "ChromeLocationBarModelDelegate::GetVectorIconOverride()"]
+    lines += [" " + l for l in delegate_context]
     lines += ["-" + l for l in delegate_removed]
     lines += ["+" + l for l in delegate_added]
-    lines += [" " + '  if (url.SchemeIs(extensions::kExtensionScheme)) {']
     lines += ["diff --git a/%s b/%s" % (c.TOOLBAR_GN_PATH, c.TOOLBAR_GN_PATH),
-              "@@ -50,2 +50,3 @@"]
+              "@@ -77,6 +77,7 @@ " + gn_header]
+    lines += [" " + l for l in gn_context]
     lines += ["+" + l for l in gn_added]
     if extra_file:
         lines += ["diff --git a/%s b/%s" % (extra_file, extra_file),
@@ -86,6 +97,17 @@ class IconRejectionTest(unittest.TestCase):
         self.assertTrue(any("expected >= 4 rays" in f
                             for f in c.check_icon(self._write(text))))
 
+    def test_extra_fixed_colour_fails(self):
+        """A fifth PATH_COLOR_ARGB row (off-palette fixed colour) fails the
+        exact-palette check."""
+        text = _ICON.read_text().replace(
+            "</svg>" if "</svg>" in _ICON.read_text() else "LINE_TO, 3.36f, 12.64f",
+            "LINE_TO, 3.36f, 12.64f,\nNEW_PATH,\n"
+            "PATH_COLOR_ARGB, 0xFF, 0x00, 0x00, 0x00,\n"
+            "STROKE, 1.0f,\nMOVE_TO, 1, 1,\nLINE_TO, 2, 2")
+        self.assertTrue(any("exactly" in f
+                            for f in c.check_icon(self._write(text))))
+
 
 class PatchSurgicalityTest(unittest.TestCase):
     def setUp(self):
@@ -128,6 +150,26 @@ class PatchSurgicalityTest(unittest.TestCase):
     def test_missing_dep_edge_fails(self):
         patch = self._patch(_patch_text(gn_added=['    "//other/dep",']))
         self.assertTrue(any("dep edge" in f for f in c.check_patch(patch)))
+
+    def test_wrong_arm_anchor_fails(self):
+        """A swap landing in a hunk NOT framed by the kChromeUIScheme test
+        (e.g. the extension arm) must fail the anchor check."""
+        patch = self._patch(_patch_text(
+            delegate_context=['  if (url.SchemeIs(extensions::kExtensionScheme)) {']))
+        self.assertTrue(any("not anchored in the kChromeUIScheme arm" in f
+                            for f in c.check_patch(patch)))
+
+    def test_wrong_target_dep_fails(self):
+        patch = self._patch(_patch_text(gn_header='source_set("impl") {'))
+        self.assertTrue(any('not anchored in source_set("toolbar")' in f
+                            for f in c.check_patch(patch)))
+
+    def test_wrong_scope_dep_fails(self):
+        """A dep inserted outside the non-Android deps block (different
+        sibling context) must fail the scope check."""
+        patch = self._patch(_patch_text(
+            gn_context=['    "//components/search",']))
+        self.assertTrue(any("wrong scope" in f for f in c.check_patch(patch)))
 
 
 if __name__ == "__main__":

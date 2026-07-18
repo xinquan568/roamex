@@ -48,11 +48,15 @@ def check_icon(icon_path):
     failures = []
     if CANVAS not in text:
         failures.append(f"{icon_path}: expected '{CANVAS}'")
-    for argb in PALETTE:
-        if f"PATH_COLOR_ARGB, 0xFF, {argb}" not in text:
-            failures.append(
-                f"{icon_path}: missing fixed palette colour {argb} — the chip"
-                " must not be tint-driven")
+    # EXACTLY the four palette rows, in ray order — an extra or off-palette
+    # fixed colour is as wrong as a missing one.
+    rows = re.findall(r"^PATH_COLOR_ARGB, 0xFF, (.+?),\s*$", text,
+                      flags=re.MULTILINE)
+    if rows != list(PALETTE):
+        failures.append(
+            f"{icon_path}: PATH_COLOR_ARGB rows {rows} != the expected"
+            f" ordered palette {list(PALETTE)} — the chip must carry exactly"
+            " the four ray colours")
     strokes = len(re.findall(r"^STROKE,", text, flags=re.MULTILINE))
     if strokes < 4:
         failures.append(
@@ -65,17 +69,20 @@ def check_icon(icon_path):
 
 
 def _patch_file_sections(patch_text):
-    """{path: (added, removed, context)} — context matters (roam-169)."""
+    """{path: (added, removed, context, hunk_headers)} — context and the
+    hunk-header anchors matter: they pin WHERE a hunk lands (roam-169 +
+    this issue's step-8 hardening)."""
     sections = {}
     current = None
     in_hunk = False
     for line in patch_text.splitlines():
         if line.startswith("diff --git "):
             current = line.split(" b/", 1)[-1].strip()
-            sections[current] = ([], [], [])
+            sections[current] = ([], [], [], [])
             in_hunk = False
         elif current and line.startswith("@@"):
             in_hunk = True
+            sections[current][3].append(line.split("@@")[-1].strip())
         elif current and line.startswith("+") and not line.startswith("+++"):
             sections[current][0].append(line[1:])
         elif current and line.startswith("-") and not line.startswith("---"):
@@ -101,7 +108,7 @@ def check_patch(patch_path):
     if delegate is None:
         failures.append(f"{patch_path}: no diff section for {DELEGATE_PATH}")
     else:
-        added, removed, _context = delegate
+        added, removed, context, _headers = delegate
         if not any("kRoamuxProductIcon" in line for line in added):
             failures.append(
                 f"{patch_path}: delegate hunk does not return the Roamux icon")
@@ -109,18 +116,42 @@ def check_patch(patch_path):
             failures.append(
                 f"{patch_path}: delegate hunk does not remove the Chromium"
                 " product return")
+        # The swap must land INSIDE the kChromeUIScheme arm: the unchanged
+        # scheme test must frame the hunk as context (a wrong-arm swap would
+        # carry a different scheme line, or none).
+        if not any("url.SchemeIs(content::kChromeUIScheme)" in line
+                   for line in context):
+            failures.append(
+                f"{patch_path}: delegate return-swap hunk is not anchored in"
+                " the kChromeUIScheme arm (scheme test absent from context)")
         for arm in OTHER_ARMS:
-            if any(arm in line for line in removed):
+            if any(arm in line for line in added + removed):
                 failures.append(
-                    f"{patch_path}: delegate hunk removes the {arm} arm — the"
+                    f"{patch_path}: delegate hunk touches the {arm} arm — the"
                     " patch must swap only the kChromeUIScheme return")
     gn = sections.get(TOOLBAR_GN_PATH)
     if gn is None:
         failures.append(f"{patch_path}: no diff section for {TOOLBAR_GN_PATH}")
-    elif not any("//roamux/browser/ui/icons" in line for line in gn[0]):
-        failures.append(
-            f"{patch_path}: toolbar BUILD.gn hunk lacks the"
-            " //roamux/browser/ui/icons dep edge")
+    else:
+        gn_added, _gn_removed, gn_context, gn_headers = gn
+        if not any("//roamux/browser/ui/icons" in line for line in gn_added):
+            failures.append(
+                f"{patch_path}: toolbar BUILD.gn hunk lacks the"
+                " //roamux/browser/ui/icons dep edge")
+        # The dep must land in source_set("toolbar")'s non-Android deps block:
+        # the git hunk header names the enclosing target, and the block's
+        # sibling deps frame the insertion as context.
+        if not any('source_set("toolbar")' in header for header in gn_headers):
+            failures.append(
+                f"{patch_path}: toolbar BUILD.gn hunk is not anchored in"
+                ' source_set("toolbar") (hunk header)')
+        non_android_siblings = ("//components/user_education/common",
+                                "//chrome/browser/ui/tabs:tab_strip")
+        if not any(any(sib in line for sib in non_android_siblings)
+                   for line in gn_context):
+            failures.append(
+                f"{patch_path}: toolbar BUILD.gn dep edge is not framed by the"
+                " non-Android deps block's siblings — wrong scope?")
     return failures
 
 
