@@ -5,7 +5,8 @@
 #include "base/feature_list.h"
 
 // Per-feature base::Feature flags — each ships DISABLED by default until its
-// epic completes (plan P3).
+// epic completes (plan P3), then flips on with the flag kept as a kill-switch
+// (first: kRoamuxSchemeAlias, roam-179).
 namespace roamux::features {
 
 BASE_DECLARE_FEATURE(kTabStripPosition); // E1 — configurable tab-strip position
