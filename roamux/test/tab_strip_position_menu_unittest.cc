@@ -57,6 +57,18 @@ TEST_F(TabStripPositionMenuTest, FlagOnAppendsSubmenuWithFourRadioItems) {
   }
 }
 
+TEST_F(TabStripPositionMenuTest, SubmenuTitleIsEndUserCopy) {
+  base::test::ScopedFeatureList features;
+  features.InitAndEnableFeature(features::kTabStripPosition);
+  parent_.AddItem(1, u"existing item");
+  std::unique_ptr<ui::SimpleMenuModel> submenu =
+      MaybeAppendTabStripPositionSubMenu(&parent_, &pref_service_);
+  ASSERT_NE(nullptr, submenu);
+  // roam-184: the developer-facing "(Roamux)" suffix is dropped for end users.
+  EXPECT_EQ(u"Tab strip position",
+            parent_.GetLabelAt(parent_.GetItemCount() - 1));
+}
+
 TEST_F(TabStripPositionMenuTest, CheckedItemMirrorsThePref) {
   base::test::ScopedFeatureList features;
   features.InitAndEnableFeature(features::kTabStripPosition);

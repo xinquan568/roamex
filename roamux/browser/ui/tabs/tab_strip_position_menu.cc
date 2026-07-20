@@ -56,8 +56,8 @@ std::unique_ptr<ui::SimpleMenuModel> MaybeAppendTabStripPositionSubMenu(
   }
   auto submenu = std::make_unique<TabStripPositionMenuModel>(pref_service);
   parent->AddSeparator(ui::NORMAL_SEPARATOR);
-  parent->AddSubMenu(kTabStripPositionSubMenuCommandId,
-                     u"Tab strip position (Roamux)", submenu.get());
+  parent->AddSubMenu(kTabStripPositionSubMenuCommandId, u"Tab strip position",
+                     submenu.get());
   return submenu;
 }
 

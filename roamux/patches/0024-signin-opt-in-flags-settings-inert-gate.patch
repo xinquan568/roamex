@@ -200,26 +200,30 @@
    (*s_allowlist)["roamux.tabs.strip_position"] =
        settings_api::PrefType::kNumber;
  
+diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.html b/chrome/browser/resources/settings/appearance_page/appearance_page.html
+index cc1159f..e5491a4 100644
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.html
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html
-@@ -180,6 +180,14 @@
-                 menu-options="[[roamuxTabStripPositionOptions_]]">
-             </settings-dropdown-menu>
+@@ -203,6 +203,14 @@
            </div>
-+        </template>
-+
+         </template>
+ 
 +        <template is="dom-if" if="[[roamuxSigninOptInEnabled_]]">
 +          <settings-toggle-button id="roamuxSigninOptIn"
 +              pref="{{prefs.roamux.signin.optional_entry_point_enabled}}"
 +              label="Optional Google sign-in entry point (Roamux)"
 +              sub-label="Off by default. Re-exposes the Chromium sign-in/sync surfaces after you relaunch. Functional sign-in additionally requires a build with Google API keys and Google authorization; otherwise the surfaces explain why sign-in is unavailable.">
 +          </settings-toggle-button>
-         </template>
- 
++        </template>
++
          <template is="dom-if" if="[[showVerticalTabsEnabled_]]">
+           <div class="cr-row">
+             <div class="flex cr-padded-text" aria-hidden="true">
+diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
+index 3c82543..bb50bc1 100644
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
-@@ -242,6 +242,14 @@
+@@ -246,6 +246,14 @@ export class SettingsAppearancePageElement extends
          },
        },
  
@@ -234,7 +238,7 @@
        roamuxTabStripPositionOptions_: {
          type: Array,
          value() {
-@@ -333,6 +341,7 @@
+@@ -337,6 +345,7 @@ export class SettingsAppearancePageElement extends
    declare private isWallpaperPolicyControlled_: boolean;
    declare private fontSizeOptions_: DropdownMenuOptionList;
    declare private roamuxTabStripPositionEnabled_: boolean;

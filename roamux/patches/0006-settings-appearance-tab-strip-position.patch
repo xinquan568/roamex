@@ -14,23 +14,44 @@ index e81d7f44bf..94877a0306 100644
    (*s_allowlist)[::embedder_support::kAlternateErrorPagesEnabled] =
        settings_api::PrefType::kBoolean;
 diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.html b/chrome/browser/resources/settings/appearance_page/appearance_page.html
-index 89e745d043..5e0a09805b 100644
+index 89e745d..7d58c2e 100644
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.html
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html
-@@ -169,6 +169,19 @@
+@@ -169,6 +169,40 @@
              label="$i18n{showBookmarksBar}">
          </settings-toggle-button>
  
 +        <template is="dom-if" if="[[roamuxTabStripPositionEnabled_]]">
 +          <div class="cr-row">
 +            <div class="flex cr-padded-text" aria-hidden="true">
-+              Tab strip position (Roamux)
++              Tab strip position
 +            </div>
 +            <settings-dropdown-menu id="roamuxTabStripPosition"
-+                label="Tab strip position (Roamux)"
++                label="Tab strip position"
 +                pref="{{prefs.roamux.tabs.strip_position}}"
 +                menu-options="[[roamuxTabStripPositionOptions_]]">
 +            </settings-dropdown-menu>
++          </div>
++          <!-- Roamux (roam-184): sub-toggles for the vertical (Left/Right)
++               placements, re-homing the upstream vertical-tabs sub-settings. -->
++          <div class="list-frame indented-toggles"
++               hidden="[[!showRoamuxVerticalSubToggles_(
++                 prefs.roamux.tabs.strip_position.value)]]">
++            <template is="dom-if" if="[[showVerticalTabsExpandOnHoverEnabled_]]">
++              <settings-toggle-button id="roamuxExpandOnHover"
++                  pref="{{prefs.vertical_tabs.expand_on_hover}}"
++                  label="$i18n{showVerticalTabsExpandOnHover}">
++              </settings-toggle-button>
++            </template>
++            <template is="dom-if" if="[[showTabSearchEnabled_]]">
++              <template is="dom-if" if="[[showProjectsPanelEnabled_]]">
++                <settings-toggle-button id="roamuxShowOrganizer"
++                    pref="{{prefs.projects_panel.pinned_to_tabstrip}}"
++                    label="$i18n{showProjectsPanelButton}"
++                    on-change="onShowProjectsPanelButtonChange_">
++                </settings-toggle-button>
++              </template>
++            </template>
 +          </div>
 +        </template>
 +
@@ -38,7 +59,7 @@ index 89e745d043..5e0a09805b 100644
            <div class="cr-row">
              <div class="flex cr-padded-text" aria-hidden="true">
 diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
-index 7e49761..ea759d4 100644
+index 7e49761..69b4f4b 100644
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 @@ -230,7 +230,30 @@ export class SettingsAppearancePageElement extends
@@ -82,6 +103,19 @@ index 7e49761..ea759d4 100644
    declare private colorSchemeModeOptions_:
        Array<{value: ColorSchemeMode, name: string}>;
    declare private selectedColorSchemeMode_: ColorSchemeMode|undefined;
+@@ -590,6 +615,12 @@ export class SettingsAppearancePageElement extends
+         this.getPref<boolean>('vertical_tabs.enabled').value;
+   }
+ 
++  // Roamux (roam-184): the roamux placement sub-toggles ride under the roamux
++  // row only for the vertical placements (Left=2, Right=3).
++  private showRoamuxVerticalSubToggles_(placement: number): boolean {
++    return placement === 2 || placement === 3;
++  }
++
+ 
+   private onManagedDialogClosed_() {
+     this.showManagedThemeDialog_ = false;
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 5ef79ef4e8..a087bb5eac 100644
 --- a/chrome/browser/ui/BUILD.gn
