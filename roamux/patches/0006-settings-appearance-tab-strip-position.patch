@@ -38,13 +38,22 @@ index 89e745d043..5e0a09805b 100644
            <div class="cr-row">
              <div class="flex cr-padded-text" aria-hidden="true">
 diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
-index 7e49761b1b..3c0e5f0ca3 100644
+index 7e49761..ea759d4 100644
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.ts
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_page.ts
-@@ -234,6 +234,25 @@ export class SettingsAppearancePageElement extends
-         },
-       },
- 
+@@ -230,7 +230,30 @@ export class SettingsAppearancePageElement extends
+       showVerticalTabsEnabled_: {
+         type: Boolean,
+         value() {
+-          return loadTimeData.getBoolean('showVerticalTabsEnabled');
++          // Roamux (roam-183): the roamux placement is the sole tab-position
++          // control when its flag is on, so the upstream Vertical/Horizontal
++          // row (this property's only consumer) is suppressed.
++          return loadTimeData.getBoolean('showVerticalTabsEnabled') &&
++              !loadTimeData.getBoolean('roamuxTabStripPositionEnabled');
++        },
++      },
++
 +      roamuxTabStripPositionEnabled_: {
 +        type: Boolean,
 +        value() {
@@ -61,13 +70,10 @@ index 7e49761b1b..3c0e5f0ca3 100644
 +            {value: 2, name: 'Left'},
 +            {value: 3, name: 'Right'},
 +          ];
-+        },
-+      },
-+
-       showVerticalTabsExpandOnHoverEnabled_: {
-         type: Boolean,
-         value() {
-@@ -288,6 +307,8 @@ export class SettingsAppearancePageElement extends
+         },
+       },
+ 
+@@ -288,6 +311,8 @@ export class SettingsAppearancePageElement extends
    declare private defaultZoom_: number;
    declare private isWallpaperPolicyControlled_: boolean;
    declare private fontSizeOptions_: DropdownMenuOptionList;

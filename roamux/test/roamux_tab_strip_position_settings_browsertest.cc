@@ -8,6 +8,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -154,6 +155,68 @@ IN_PROC_BROWSER_TEST_F(RoamuxTabStripPositionSettingsFlagOffTest,
   EXPECT_EQ(true,
             content::EvalJs(web_contents, WaitForIdScript("themeRow", 100)));
   // …then assert the roamux row was never stamped (single settle pass).
+  EXPECT_EQ(false,
+            content::EvalJs(web_contents,
+                            WaitForIdScript("roamuxTabStripPosition", 5)));
+}
+
+// roam-183: the upstream #tabStripPosition row is gated on
+// showVerticalTabsEnabled = tabs::IsVerticalTabsFeatureEnabled(), so these
+// fixtures enable the upstream feature to make the row present-by-default; the
+// guard's job is to hide it when the roamux flag is also on.
+
+// Flag ON + upstream vertical-tabs feature ON: the roamux row is present and
+// the upstream row is suppressed (roam-183).
+class RoamuxHideUpstreamRowTest : public roamux::test::RoamuxBrowserTest {
+ public:
+  RoamuxHideUpstreamRowTest() {
+    features_.InitWithFeatures(
+        {features::kTabStripPosition, ::tabs::kVerticalTabs}, {});
+  }
+
+ protected:
+  base::test::ScopedFeatureList features_;
+};
+
+IN_PROC_BROWSER_TEST_F(RoamuxHideUpstreamRowTest,
+                       UpstreamRowHiddenWhileRoamuxRowShown) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), GURL("chrome://settings/appearance")));
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  EXPECT_EQ(true,
+            content::EvalJs(web_contents, WaitForIdScript("themeRow", 100)));
+  // The roamux row is present…
+  EXPECT_EQ(true,
+            content::EvalJs(web_contents,
+                            WaitForIdScript("roamuxTabStripPosition", 100)));
+  // …and the upstream Vertical/Horizontal row is suppressed.
+  EXPECT_EQ(false, content::EvalJs(web_contents,
+                                   WaitForIdScript("tabStripPosition", 5)));
+}
+
+// Flag OFF + upstream vertical-tabs feature ON: stock — the upstream row is
+// present and the roamux row absent.
+class RoamuxUpstreamRowStockTest : public roamux::test::RoamuxBrowserTest {
+ public:
+  RoamuxUpstreamRowStockTest() {
+    features_.InitWithFeatures({::tabs::kVerticalTabs},
+                               {features::kTabStripPosition});
+  }
+
+ protected:
+  base::test::ScopedFeatureList features_;
+};
+
+IN_PROC_BROWSER_TEST_F(RoamuxUpstreamRowStockTest, UpstreamRowPresentStock) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), GURL("chrome://settings/appearance")));
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  EXPECT_EQ(true,
+            content::EvalJs(web_contents, WaitForIdScript("themeRow", 100)));
+  EXPECT_EQ(true, content::EvalJs(web_contents,
+                                  WaitForIdScript("tabStripPosition", 100)));
   EXPECT_EQ(false,
             content::EvalJs(web_contents,
                             WaitForIdScript("roamuxTabStripPosition", 5)));

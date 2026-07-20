@@ -183,6 +183,7 @@ test("roamux_browsertests") {
     "test/roamux_edge_import_coordinator_browsertest.cc",
     "test/roamux_edge_import_driver_browsertest.cc",
     "test/roamux_frame_rtl_fullscreen_browsertest.cc",
+    "test/roamux_hide_upstream_tab_controls_browsertest.cc",
     "test/roamux_omnibox_icon_browsertest.cc",
     "test/roamux_indexed_db_import_browsertest.cc",
     "test/roamux_initial_url_browsertest.cc",
