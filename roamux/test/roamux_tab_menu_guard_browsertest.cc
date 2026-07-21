@@ -19,6 +19,7 @@
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
 #include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "content/public/test/browser_test.h"
+#include "roamux/browser/ui/tabs/initial_url_menu.h"
 #include "roamux/browser/ui/tabs/tab_strip_position_menu.h"
 #include "roamux/common/roamux_features.h"
 #include "roamux/test/support/roamux_browser_test.h"
@@ -146,6 +147,74 @@ IN_PROC_BROWSER_TEST_F(RoamuxTabMenuGuardTest,
 
   for (int id = tabs::kTabStripPositionSubMenuCommandId;
        id <= tabs::kTabStripPositionFirstItemCommandId + 3; ++id) {
+    EXPECT_TRUE(controller.IsCommandIdEnabled(id));
+    EXPECT_FALSE(controller.IsCommandIdChecked(id));
+    EXPECT_FALSE(controller.IsCommandIdAlerted(id));
+    ui::Accelerator accelerator;
+    EXPECT_FALSE(controller.GetAcceleratorForCommandId(id, &accelerator));
+    controller.ExecuteCommand(id, /*event_flags=*/0);
+  }
+  EXPECT_EQ(0, fake.call_count());
+
+  fake.set_strict(false);
+  EXPECT_FALSE(controller.IsCommandIdChecked(TabStripModel::CommandCloseTab));
+  EXPECT_EQ(1, fake.call_count());
+}
+
+// roam-194: the Initial URL submenu (roam-14, patch 0012, ids 2110-2112) has
+// the same anchor-in-parent-model topology as roam-181's 2101. Its fixture
+// enables kInitialUrl — which no other fixture in this file does — while
+// kTabStripPosition keeps its shipped-on default (roam-185), so both roamux
+// anchors coexist in the model, as they will for users once roam-187 lands.
+class RoamuxInitialUrlMenuGuardTest : public RoamuxBrowserTest {
+ public:
+  RoamuxInitialUrlMenuGuardTest() {
+    feature_list_.InitAndEnableFeature(roamux::features::kInitialUrl);
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+// The roam-194 crash regression: with RoamuxInitialUrl on, the 2110 anchor
+// sits in the parent TabMenuModel and MenuControllerCocoa's eager IsEnabledAt
+// sweep queries it on a bare right-click. Pre-guard this dies on the 2110 row
+// (NOTREACHED in TabStripModel::IsContextMenuCommandEnabled) exactly as
+// roam-181's 2101 did.
+IN_PROC_BROWSER_TEST_F(RoamuxInitialUrlMenuGuardTest,
+                       ProductionDelegatePairSurvivesInitialUrlSweep) {
+  BrowserTabStripController* const controller =
+      GetProductionDelegate(browser());
+  ASSERT_TRUE(controller);
+  TabContextMenuController context_menu_controller(0, controller);
+  TabMenuModel model(&context_menu_controller,
+                     browser()->GetFeatures().tab_menu_model_delegate(),
+                     browser()->tab_strip_model(), 0);
+
+  // Assert on the 2110 anchor specifically — the 2101 anchor is also present
+  // (kTabStripPosition ships enabled) and must not be conflated with it.
+  bool saw_initial_url_anchor = false;
+  for (size_t i = 0; i < model.GetItemCount(); ++i) {
+    if (model.GetCommandIdAt(i) == tabs::kInitialUrlSubMenuCommandId) {
+      saw_initial_url_anchor = true;
+    }
+    model.IsEnabledAt(i);
+    model.IsItemCheckedAt(i);
+  }
+  EXPECT_TRUE(saw_initial_url_anchor);
+}
+
+// The guard for the initial-url range: strict direct checks over the roamux
+// ids ONLY (upstream rows legitimately route to the delegate, so a strict
+// full-row sweep would over-fail); the upstream passthrough control proves
+// the widened guard is range-scoped, not blanket.
+IN_PROC_BROWSER_TEST_F(RoamuxInitialUrlMenuGuardTest,
+                       GuardShortCircuitsInitialUrlIds) {
+  RecordingDelegate fake;
+  TabContextMenuController controller(0, &fake);
+
+  for (int id = tabs::kInitialUrlSubMenuCommandId;
+       id <= tabs::kSetInitialUrlToCurrentPageCommandId; ++id) {
     EXPECT_TRUE(controller.IsCommandIdEnabled(id));
     EXPECT_FALSE(controller.IsCommandIdChecked(id));
     EXPECT_FALSE(controller.IsCommandIdAlerted(id));

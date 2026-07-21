@@ -48,25 +48,28 @@ index ef54948fc4..689614160b 100644
    // `tab_strip_` needs to outlive this class.
    raw_ptr<TabStripModel> tab_strip_;
 diff --git a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
-index 3d49f6381e..a1cae96821 100644
+index 3d49f6381e..fa8ebe7968 100644
 --- a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
 +++ b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
-@@ -5,6 +5,7 @@
+@@ -5,6 +5,8 @@
  #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
  
  #include "base/functional/callback_helpers.h"
++#include "roamux/browser/ui/tabs/initial_url_menu.h"
 +#include "roamux/browser/ui/tabs/tab_strip_position_menu.h"
  #include "ui/gfx/geometry/rect.h"
  #include "ui/views/controls/menu/menu_runner.h"
  
-@@ -40,21 +41,39 @@ void TabContextMenuController::CloseMenu() {
+@@ -40,21 +42,44 @@ void TabContextMenuController::CloseMenu() {
  }
  
  bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
-+  // Roamux (roam-181): roamux submenu ids are owned by the roamux submenu
-+  // model; the anchor row's id must never reach the ContextMenuCommand cast
-+  // below (TabStripModel's switches NOTREACHED()/CHECK on unknown values).
-+  if (roamux::tabs::IsTabStripPositionCommandId(command_id)) {
++  // Roamux (roam-181, roam-194): roamux submenu ids are owned by their roamux
++  // submenu models; the anchor rows' ids must never reach the
++  // ContextMenuCommand cast below (TabStripModel's switches NOTREACHED()/CHECK
++  // on unknown values).
++  if (roamux::tabs::IsTabStripPositionCommandId(command_id) ||
++      roamux::tabs::IsInitialUrlCommandId(command_id)) {
 +    return false;
 +  }
    return delegate_->IsContextMenuCommandChecked(
@@ -74,8 +77,9 @@ index 3d49f6381e..a1cae96821 100644
  }
  
  bool TabContextMenuController::IsCommandIdEnabled(int command_id) const {
-+  // Roamux (roam-181): see IsCommandIdChecked.
-+  if (roamux::tabs::IsTabStripPositionCommandId(command_id)) {
++  // Roamux (roam-181, roam-194): see IsCommandIdChecked.
++  if (roamux::tabs::IsTabStripPositionCommandId(command_id) ||
++      roamux::tabs::IsInitialUrlCommandId(command_id)) {
 +    return true;
 +  }
    return delegate_->IsContextMenuCommandEnabled(
@@ -83,8 +87,9 @@ index 3d49f6381e..a1cae96821 100644
  }
  
  bool TabContextMenuController::IsCommandIdAlerted(int command_id) const {
-+  // Roamux (roam-181): see IsCommandIdChecked.
-+  if (roamux::tabs::IsTabStripPositionCommandId(command_id)) {
++  // Roamux (roam-181, roam-194): see IsCommandIdChecked.
++  if (roamux::tabs::IsTabStripPositionCommandId(command_id) ||
++      roamux::tabs::IsInitialUrlCommandId(command_id)) {
 +    return false;
 +  }
    return delegate_->IsContextMenuCommandAlerted(
@@ -92,19 +97,21 @@ index 3d49f6381e..a1cae96821 100644
  }
  
  void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
-+  // Roamux (roam-181): see IsCommandIdChecked.
-+  if (roamux::tabs::IsTabStripPositionCommandId(command_id)) {
++  // Roamux (roam-181, roam-194): see IsCommandIdChecked.
++  if (roamux::tabs::IsTabStripPositionCommandId(command_id) ||
++      roamux::tabs::IsInitialUrlCommandId(command_id)) {
 +    return;
 +  }
    delegate_->ExecuteContextMenuCommand(
        tab_index_, static_cast<TabStripModel::ContextMenuCommand>(command_id),
        event_flags);
-@@ -63,5 +82,9 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
+@@ -63,5 +88,10 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
  bool TabContextMenuController::GetAcceleratorForCommandId(
      int command_id,
      ui::Accelerator* accelerator) const {
-+  // Roamux (roam-181): see IsCommandIdChecked.
-+  if (roamux::tabs::IsTabStripPositionCommandId(command_id)) {
++  // Roamux (roam-181, roam-194): see IsCommandIdChecked.
++  if (roamux::tabs::IsTabStripPositionCommandId(command_id) ||
++      roamux::tabs::IsInitialUrlCommandId(command_id)) {
 +    return false;
 +  }
    return delegate_->GetContextMenuAccelerator(command_id, accelerator);

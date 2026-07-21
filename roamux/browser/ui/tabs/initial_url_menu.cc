@@ -13,13 +13,9 @@ namespace roamux::tabs {
 
 namespace {
 
-// Command ids in the roamux private high range (0005 uses 2101-2105). The
-// submenu id is what the parent menu sees; the item ids are resolved by this
-// model's own delegate.
-constexpr int kInitialUrlSubMenu = 2110;
-constexpr int kEditInitialUrl = 2111;
-constexpr int kSetInitialUrlToCurrentPage = 2112;
-
+// The command ids and their guard predicate are exported from the header
+// (roam-194): the guard in patch 0005 and the tab-menu guard browsertest need
+// to name them.
 bool CanSetToCurrentPage(content::WebContents* contents) {
   const GURL& url = contents->GetLastCommittedURL();
   return url.is_valid() && !url.IsAboutBlank() &&
@@ -33,13 +29,14 @@ class InitialUrlMenuModel : public ui::SimpleMenuModel,
  public:
   explicit InitialUrlMenuModel(content::WebContents* contents)
       : ui::SimpleMenuModel(this), contents_(contents) {
-    AddItem(kEditInitialUrl, u"Edit initial URL…");
-    AddItem(kSetInitialUrlToCurrentPage, u"Set initial URL to current page");
+    AddItem(kEditInitialUrlCommandId, u"Edit initial URL…");
+    AddItem(kSetInitialUrlToCurrentPageCommandId,
+            u"Set initial URL to current page");
   }
 
   // ui::SimpleMenuModel::Delegate:
   bool IsCommandIdEnabled(int command_id) const override {
-    if (command_id == kSetInitialUrlToCurrentPage) {
+    if (command_id == kSetInitialUrlToCurrentPageCommandId) {
       return CanSetToCurrentPage(contents_);
     }
     return true;
@@ -53,10 +50,10 @@ class InitialUrlMenuModel : public ui::SimpleMenuModel,
       return;
     }
     switch (command_id) {
-      case kEditInitialUrl:
+      case kEditInitialUrlCommandId:
         ShowEditInitialUrlDialog(contents_);
         break;
-      case kSetInitialUrlToCurrentPage:
+      case kSetInitialUrlToCurrentPageCommandId:
         if (CanSetToCurrentPage(contents_)) {
           helper->SetUserInitialUrl(contents_->GetLastCommittedURL());
         }
@@ -78,7 +75,8 @@ std::unique_ptr<ui::SimpleMenuModel> MaybeAppendInitialUrlSubMenu(
     return nullptr;
   }
   auto submenu = std::make_unique<InitialUrlMenuModel>(contents);
-  parent->AddSubMenu(kInitialUrlSubMenu, u"Initial URL", submenu.get());
+  parent->AddSubMenu(kInitialUrlSubMenuCommandId, u"Initial URL",
+                     submenu.get());
   return submenu;
 }
 
