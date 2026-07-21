@@ -8,7 +8,7 @@ BASE_FEATURE(kTabStripPosition, "RoamuxTabStripPosition",
 BASE_FEATURE(kInitialUrl, "RoamuxInitialUrl",
              base::FEATURE_ENABLED_BY_DEFAULT);  // roam-187: shipped default-on
 BASE_FEATURE(kEdgeImport, "RoamuxEdgeImport",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);  // roam-190: shipped default-on
 BASE_FEATURE(kTabVisitNav, "RoamuxTabVisitNav",
              base::FEATURE_ENABLED_BY_DEFAULT);  // roam-189: shipped default-on
 BASE_FEATURE(kBraveStyleProfiles, "RoamuxBraveStyleProfiles",

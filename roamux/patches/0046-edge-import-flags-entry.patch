@@ -1,0 +1,45 @@
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+index ee08bc7..c7bd968 100644
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -4775,6 +4775,12 @@ const FeatureEntry kFeatureEntries[] = {
+      "them in most-recently-used order.",
+      kOsMac | kOsWin | kOsLinux,
+      FEATURE_VALUE_TYPE(roamux::features::kTabVisitNav)},
++    // Roamux (roam-190): E3 Microsoft Edge import, shipped default-on and
++    // user-toggleable here. macOS-only: the importer reads macOS Edge
++    // profiles and Keychain secrets.
++    {"roamux-edge-import", "Roamux: import from Microsoft Edge",
++     "Adds Microsoft Edge as a source in the import-data dialog on macOS.",
++     kOsMac, FEATURE_VALUE_TYPE(roamux::features::kEdgeImport)},
+ // Include generated flags for flag unexpiry; see //docs/flag_expiry.md and
+ // //tools/flags/generate_unexpire_flags.py.
+ #include "build/chromeos_buildflags.h"
+diff --git a/chrome/browser/flag-metadata.json b/chrome/browser/flag-metadata.json
+index a0cb414..8b3d010 100644
+--- a/chrome/browser/flag-metadata.json
++++ b/chrome/browser/flag-metadata.json
+@@ -8395,6 +8395,11 @@
+     "owners": [ "eleanorlee@google.com", "lazzzis@google.com", "twellington@chromium.org" ],
+     "expiry_milestone": 150
+   },
++  {
++    "name": "roamux-edge-import",
++    "owners": [ "xinquan568@users.noreply.github.com" ],
++    "expiry_milestone": -1
++  },
+   {
+     "name": "roamux-initial-url",
+     "owners": [ "xinquan568@users.noreply.github.com" ],
+diff --git a/chrome/browser/flag-never-expire-list.json b/chrome/browser/flag-never-expire-list.json
+index 83f4d61..ae5293c 100644
+--- a/chrome/browser/flag-never-expire-list.json
++++ b/chrome/browser/flag-never-expire-list.json
+@@ -115,6 +115,7 @@
+   "related-website-sets-permission-grants",
+   "release-notes-notification-all-channels",
+   "release-notes-notification-always-eligible",
++  "roamux-edge-import",
+   "roamux-initial-url",
+   "roamux-signin-opt-in",
+   "roamux-tab-strip-position",

@@ -41,4 +41,10 @@ TEST(RoamuxFeaturesTest, TabVisitNavEnabledByDefault) {
   EXPECT_TRUE(base::FeatureList::IsEnabled(roamux::features::kTabVisitNav));
 }
 
+TEST(RoamuxFeaturesTest, EdgeImportEnabledByDefault) {
+  // roam-190: the E3 Microsoft Edge import ships enabled by default
+  // (chrome://flags/#roamux-edge-import lets users opt out).
+  EXPECT_TRUE(base::FeatureList::IsEnabled(roamux::features::kEdgeImport));
+}
+
 }  // namespace
