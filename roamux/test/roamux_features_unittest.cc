@@ -14,9 +14,15 @@ TEST(RoamuxFeaturesTest, FeatureTogglesOnUnderScopedFeatureList) {
   base::test::ScopedFeatureList feature_list;
   feature_list.InitAndEnableFeature(roamux::features::kTabVisitNav);
   EXPECT_TRUE(base::FeatureList::IsEnabled(roamux::features::kTabVisitNav));
-  // A flag not named in the override keeps its disabled default.
-  EXPECT_FALSE(
-      base::FeatureList::IsEnabled(roamux::features::kTabStripPosition));
+  // A flag not named in the override keeps its (disabled) default. roam-185
+  // shipped kTabStripPosition default-ON, so use a still-disabled flag here.
+  EXPECT_FALSE(base::FeatureList::IsEnabled(roamux::features::kInitialUrl));
+}
+
+TEST(RoamuxFeaturesTest, TabStripPositionEnabledByDefault) {
+  // roam-185: the E1 tab-strip-position feature ships enabled by default (the
+  // chrome://flags entry lets users opt out).
+  EXPECT_TRUE(base::FeatureList::IsEnabled(roamux::features::kTabStripPosition));
 }
 
 } // namespace

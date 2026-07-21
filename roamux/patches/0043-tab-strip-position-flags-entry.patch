@@ -1,0 +1,64 @@
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+index d2df22e..28df9a6 100644
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -4752,6 +4752,13 @@ const FeatureEntry kFeatureEntries[] = {
+      "the Roamux opt-in preference were enabled. Sign-in stays "
+      "inert-with-explanation unless the build is keyed and authorized.",
+      kOsMac | kOsWin | kOsLinux, SINGLE_VALUE_TYPE(roamux::switches::kSigninOptIn)},
++    // Roamux (roam-185): the E1 4-way tab-strip position control, shipped
++    // default-on and user-toggleable here.
++    {"roamux-tab-strip-position", "Roamux: tab strip position",
++     "Enables the Roamux tab strip position control (top / bottom / left / "
++     "right) in Appearance settings and the tab context menu.",
++     kOsMac | kOsWin | kOsLinux,
++     FEATURE_VALUE_TYPE(roamux::features::kTabStripPosition)},
+ // Include generated flags for flag unexpiry; see //docs/flag_expiry.md and
+ // //tools/flags/generate_unexpire_flags.py.
+ #include "build/chromeos_buildflags.h"
+diff --git a/chrome/browser/flag-metadata.json b/chrome/browser/flag-metadata.json
+index 8d2c251..9e95876 100644
+--- a/chrome/browser/flag-metadata.json
++++ b/chrome/browser/flag-metadata.json
+@@ -8395,6 +8395,16 @@
+     "owners": [ "eleanorlee@google.com", "lazzzis@google.com", "twellington@chromium.org" ],
+     "expiry_milestone": 150
+   },
++  {
++    "name": "roamux-signin-opt-in",
++    "owners": [ "xinquan568@users.noreply.github.com" ],
++    "expiry_milestone": -1
++  },
++  {
++    "name": "roamux-tab-strip-position",
++    "owners": [ "xinquan568@users.noreply.github.com" ],
++    "expiry_milestone": -1
++  },
+   {
+     "name": "robust-window-management-experimental",
+     "owners": [ "aishwaryarj@google.com", "rathomas@google.com", "clank-large-form-factors@google.com" ],
+@@ -8428,11 +8438,6 @@
+       "owners": [ "thiabaud@google.com", "clank-performance-team@google.com" ],
+       "expiry_milestone": 150
+   },
+-  {
+-    "name": "roamux-signin-opt-in",
+-    "owners": [ "xinquan568" ],
+-    "expiry_milestone": -1
+-  },
+   {
+     "name": "saas-usage-reporting",
+     "owners": [ "janzarzycki@google.com", "igorruvinov@chromium.org" ],
+diff --git a/chrome/browser/flag-never-expire-list.json b/chrome/browser/flag-never-expire-list.json
+index 17e0303..344f743 100644
+--- a/chrome/browser/flag-never-expire-list.json
++++ b/chrome/browser/flag-never-expire-list.json
+@@ -115,6 +115,8 @@
+   "related-website-sets-permission-grants",
+   "release-notes-notification-all-channels",
+   "release-notes-notification-always-eligible",
++  "roamux-signin-opt-in",
++  "roamux-tab-strip-position",
+   "scheduler-configuration",
+   "set-market-url-for-testing",
+   "show-autofill-type-predictions",

@@ -6,10 +6,12 @@
 
 namespace {
 
-// E0 smoke (roam-1 / roam-3): the //roamux overlay links, and every feature flag ships DISABLED by
-// default (plan P3 — nothing behavioral is on until its epic completes).
+// E0 smoke (roam-1 / roam-3): the //roamux overlay links; feature flags ship
+// disabled by default until their epic completes and graduates the flag.
+// roam-185 (E1): kTabStripPosition graduated to default-ON (user-toggleable via
+// chrome://flags); the still-in-progress epics keep their disabled default.
 TEST(RoamuxSmokeTest, FeatureFlagsDefaultDisabled) {
-  EXPECT_FALSE(base::FeatureList::IsEnabled(roamux::features::kTabStripPosition));
+  EXPECT_TRUE(base::FeatureList::IsEnabled(roamux::features::kTabStripPosition));
   EXPECT_FALSE(base::FeatureList::IsEnabled(roamux::features::kInitialUrl));
   EXPECT_FALSE(base::FeatureList::IsEnabled(roamux::features::kEdgeImport));
   EXPECT_FALSE(base::FeatureList::IsEnabled(roamux::features::kTabVisitNav));

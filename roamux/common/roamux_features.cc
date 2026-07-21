@@ -4,7 +4,7 @@
 namespace roamux::features {
 
 BASE_FEATURE(kTabStripPosition, "RoamuxTabStripPosition",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);  // roam-185: shipped default-on
 BASE_FEATURE(kInitialUrl, "RoamuxInitialUrl",
              base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kEdgeImport, "RoamuxEdgeImport",
