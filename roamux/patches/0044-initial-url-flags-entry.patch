@@ -1,0 +1,47 @@
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+index 28df9a6..d392da9 100644
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -4759,6 +4759,14 @@ const FeatureEntry kFeatureEntries[] = {
+      "right) in Appearance settings and the tab context menu.",
+      kOsMac | kOsWin | kOsLinux,
+      FEATURE_VALUE_TYPE(roamux::features::kTabStripPosition)},
++    // Roamux (roam-187): the E2 per-tab initial URL, shipped default-on and
++    // user-toggleable here.
++    {"roamux-initial-url", "Roamux: per-tab initial URL",
++     "Enables the Roamux per-tab initial URL: an \"Initial URL\" tab "
++     "context-menu submenu, a dual-reload shortcut, and a Reload-initial-URL "
++     "shortcut row in Appearance settings.",
++     kOsMac | kOsWin | kOsLinux,
++     FEATURE_VALUE_TYPE(roamux::features::kInitialUrl)},
+ // Include generated flags for flag unexpiry; see //docs/flag_expiry.md and
+ // //tools/flags/generate_unexpire_flags.py.
+ #include "build/chromeos_buildflags.h"
+diff --git a/chrome/browser/flag-metadata.json b/chrome/browser/flag-metadata.json
+index 9e95876..a1004dc 100644
+--- a/chrome/browser/flag-metadata.json
++++ b/chrome/browser/flag-metadata.json
+@@ -8395,6 +8395,11 @@
+     "owners": [ "eleanorlee@google.com", "lazzzis@google.com", "twellington@chromium.org" ],
+     "expiry_milestone": 150
+   },
++  {
++    "name": "roamux-initial-url",
++    "owners": [ "xinquan568@users.noreply.github.com" ],
++    "expiry_milestone": -1
++  },
+   {
+     "name": "roamux-signin-opt-in",
+     "owners": [ "xinquan568@users.noreply.github.com" ],
+diff --git a/chrome/browser/flag-never-expire-list.json b/chrome/browser/flag-never-expire-list.json
+index 344f743..dfe7466 100644
+--- a/chrome/browser/flag-never-expire-list.json
++++ b/chrome/browser/flag-never-expire-list.json
+@@ -115,6 +115,7 @@
+   "related-website-sets-permission-grants",
+   "release-notes-notification-all-channels",
+   "release-notes-notification-always-eligible",
++  "roamux-initial-url",
+   "roamux-signin-opt-in",
+   "roamux-tab-strip-position",
+   "scheduler-configuration",
