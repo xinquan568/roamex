@@ -70,6 +70,21 @@ class Tier2JobScriptTest(unittest.TestCase):
                        "roamux_browsertests"):
             self.assertIn('"${OUT}/%s"' % binary, self.code)
 
+    def test_every_suite_run_sets_an_explicit_retry_limit(self):
+        # roam-195: the launcher ZEROES its retry limit when a --gtest_filter is passed
+        # outside bot mode (base/test/launcher/test_launcher.cc: "not in bot mode and
+        # filtered by flag ... Set reties to zero"), so the filtered roamux_browsertests
+        # line silently ran with NO retries while the two unfiltered suites kept the
+        # default of 1. Every recorded teardown-timeout flake landed in exactly that
+        # unprotected suite. The explicit flag is resolved BEFORE the filter branch, so
+        # passing it restores retries; assert it on ALL THREE invocations so a later
+        # --gtest_filter added to another suite cannot silently disarm them again.
+        run_lines = [l for l in self.code.splitlines() if '"${OUT}/roamux' in l]
+        self.assertEqual(3, len(run_lines), f"expected 3 suite runs, got {run_lines}")
+        for line in run_lines:
+            self.assertIn("--test-launcher-retry-limit=", line,
+                          f"suite run without an explicit retry limit: {line.strip()}")
+
     def test_no_sudo_no_secret_use(self):
         self.assertNotIn("sudo", self.code)
         self.assertNotIn("secrets.", self.text)

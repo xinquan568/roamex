@@ -76,11 +76,25 @@ if [ ! -d "${OUT}" ]; then
 fi
 
 autoninja -C "${OUT}" roamux_unittests roamux_browser_unittests roamux_browsertests
-"${OUT}/roamux_unittests"
-"${OUT}/roamux_browser_unittests"
+
+# roam-195: run every suite with an EXPLICIT retry limit. The launcher silently zeroes
+# retries when a --gtest_filter is passed outside bot mode (test_launcher.cc: "not in bot
+# mode and filtered by flag ... Set reties to zero"), which left the filtered
+# roamux_browsertests line — and only that line — with no retries at all, while the two
+# unfiltered suites kept the built-in default of 1. Every recorded occurrence of the
+# TaskEnvironment "CompleteShutdown took more than 30 seconds" teardown hang (roam-195)
+# crashed a test in exactly that unprotected suite, failing the whole job over a
+# post-assertion shutdown stall. The explicit switch is resolved BEFORE the filter branch,
+# so it restores retries; 2 absorbs a stochastic hang (bounded: a persistently hanging test
+# still fails after 3 attempts, ~30s each) without masking a deterministic failure — a
+# retried test is reported as such in the launcher summary. This is mitigation, not a cure:
+# roam-195 stays open for the underlying teardown stall.
+RETRY_LIMIT="${ROAMUX_CI_RETRY_LIMIT:-2}"
+"${OUT}/roamux_unittests" --test-launcher-retry-limit="${RETRY_LIMIT}"
+"${OUT}/roamux_browser_unittests" --test-launcher-retry-limit="${RETRY_LIMIT}"
 # roam-6: the settings-surface DOM suite. Filtered to the roamux tests to keep tier-2 wall-clock
 # sane while E1 is the only browser-test suite; widen as later epics add suites.
-"${OUT}/roamux_browsertests" --gtest_filter="Roamux*"
+"${OUT}/roamux_browsertests" --gtest_filter="Roamux*" --test-launcher-retry-limit="${RETRY_LIMIT}"
 
 # Staleness gate against this job's overlay.
 python3 "${GITHUB_WORKSPACE}/roamux/build/check_override_staleness.py" \
