@@ -35,12 +35,17 @@
 namespace roamux {
 namespace {
 
-// roam-206: the collapse action's current image, and the ImageModel
+// roam-206: the collapse action item, and the ImageModel
 // UpdateCollapseActionItem builds for a given icon.
-ui::ImageModel CollapseActionImage(Browser* browser) {
-  actions::ActionItem* item = actions::ActionManager::Get().FindAction(
+actions::ActionItem* CollapseActionItem(Browser* browser) {
+  return actions::ActionManager::Get().FindAction(
       kActionToggleCollapseVertical,
       browser->browser_actions()->root_action_item());
+}
+
+ui::ImageModel CollapseActionImage(Browser* browser) {
+  actions::ActionItem* item = CollapseActionItem(browser);
+  EXPECT_NE(nullptr, item);
   return item ? item->GetImage() : ui::ImageModel();
 }
 
@@ -454,7 +459,7 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
                        CollapseIconIsPhysicalUnderRTL) {
   auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
   ASSERT_NE(nullptr, controller);
-  base::i18n::SetRTLForTesting(true);
+  base::i18n::ScopedRTLForTesting scoped_rtl(true);
 
   SetPlacementAndLayout(2);  // left
   CollapseAndWait(controller, true);
@@ -467,8 +472,6 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
   EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
   CollapseAndWait(controller, false);
   EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
-
-  base::i18n::SetRTLForTesting(false);
 }
 
 // roam-206: a dock-side flip made while an enable-state lock is held must
@@ -508,9 +511,7 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripFlagOffIconTest,
                        StockIconExpressionPreserved) {
   auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
   ASSERT_NE(nullptr, controller);
-  actions::ActionItem* item = actions::ActionManager::Get().FindAction(
-      kActionToggleCollapseVertical,
-      browser()->browser_actions()->root_action_item());
+  actions::ActionItem* item = CollapseActionItem(browser());
   ASSERT_NE(nullptr, item);
 
   // Activate upstream vertical tabs so the delegate exists and collapse
@@ -521,11 +522,12 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripFlagOffIconTest,
   CollapseAndWait(controller, true);  // LTR collapsed → close (stock)
   EXPECT_EQ(IconModel(views::kMenuCloseIcon), item->GetImage());
 
-  base::i18n::SetRTLForTesting(true);
-  CollapseAndWait(controller, false);
-  CollapseAndWait(controller, true);  // re-derive under RTL → open (stock)
-  EXPECT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
-  base::i18n::SetRTLForTesting(false);
+  {
+    base::i18n::ScopedRTLForTesting scoped_rtl(true);
+    CollapseAndWait(controller, false);
+    CollapseAndWait(controller, true);  // re-derive under RTL → open (stock)
+    EXPECT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
+  }
 }
 
 }  // namespace
