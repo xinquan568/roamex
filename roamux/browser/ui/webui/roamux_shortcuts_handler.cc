@@ -4,7 +4,6 @@
 #include <string>
 
 #include "base/functional/bind.h"
-#include "base/strings/string_number_conversions.h"
 #include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/web_ui.h"
 #include "roamux/browser/tabs/shortcut_registry.h"

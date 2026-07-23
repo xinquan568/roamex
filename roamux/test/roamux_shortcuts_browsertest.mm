@@ -55,8 +55,7 @@ class ExposedHandler : public RoamuxShortcutsHandler {
 // roam-207: the chordText the handler renders for `pref_key`, or "" if absent.
 std::string ChordTextFor(RoamuxShortcutsHandler& handler,
                          const std::string& pref_key) {
-  base::ListValue list =
-      static_cast<ExposedHandler&>(handler).GetShortcutListForTesting();
+  base::ListValue list = handler.GetShortcutListForTesting();
   for (const base::Value& item : list) {
     const std::string* key = item.GetDict().FindString("key");
     if (key && *key == pref_key) {
@@ -69,9 +68,14 @@ std::string ChordTextFor(RoamuxShortcutsHandler& handler,
 
 // roam-207 T1 preflight: the exact production translation of `keycode` under
 // the current input source (mirrors ChordKeyDisplayString step 1).
-UniChar TranslateForDisplay(uint16_t keycode) {
+UniChar TranslateForDisplay(uint16_t keycode, std::string* source_id) {
   base::apple::ScopedCFTypeRef<TISInputSourceRef> source(
       TISCopyCurrentKeyboardLayoutInputSource());
+  if (source_id) {
+    NSString* ns_id = (__bridge NSString*)TISGetInputSourceProperty(
+        source.get(), kTISPropertyInputSourceID);
+    *source_id = ns_id ? [ns_id UTF8String] : "<unknown>";
+  }
   UInt32 dead_key_state = 0;
   return ui::TranslatedUnicodeCharFromKeyCode(source.get(), keycode,
                                               kUCKeyActionDisplay, 0,
@@ -177,12 +181,13 @@ IN_PROC_BROWSER_TEST_F(RoamuxShortcutsTest,
                        DefaultChordTextRendersKeyCharacters) {
   // Mechanical layout preflight: the literals below assume the builder's
   // US-ANSI layout; skip loudly (with the observed translations) otherwise.
-  const UniChar r = TranslateForDisplay(kVK_ANSI_R);
-  const UniChar lb = TranslateForDisplay(kVK_ANSI_LeftBracket);
-  const UniChar rb = TranslateForDisplay(kVK_ANSI_RightBracket);
+  std::string source_id;
+  const UniChar r = TranslateForDisplay(kVK_ANSI_R, &source_id);
+  const UniChar lb = TranslateForDisplay(kVK_ANSI_LeftBracket, nullptr);
+  const UniChar rb = TranslateForDisplay(kVK_ANSI_RightBracket, nullptr);
   if (r != 'r' || lb != '[' || rb != ']') {
-    GTEST_SKIP() << "non-US-ANSI layout: observed " << r << "/" << lb << "/"
-                 << rb;
+    GTEST_SKIP() << "non-US-ANSI layout (" << source_id << "): observed U+"
+                 << std::hex << r << "/U+" << lb << "/U+" << rb;
   }
 
   content::TestWebUI test_web_ui;

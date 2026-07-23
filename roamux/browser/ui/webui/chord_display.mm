@@ -5,6 +5,7 @@
 
 #include "base/apple/scoped_cftyperef.h"
 #include "base/i18n/case_conversion.h"
+#include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/events/keycodes/dom/keycode_converter.h"
@@ -15,12 +16,13 @@ namespace roamux {
 namespace {
 
 // Displayable = a real, single, non-control code unit. U+FFFD is the
-// conversion API's no-layout-data sentinel; surrogates cannot stand alone.
+// conversion API's no-layout-data sentinel; surrogates cannot stand alone;
+// IsUnicodeControl covers C0, DEL, and C1.
 bool IsDisplayableKeyChar(UniChar ch) {
   if (ch == 0 || ch == 0xFFFD) {
     return false;
   }
-  if (ch < 0x20 || ch == 0x7F) {
+  if (base::IsUnicodeControl(ch)) {
     return false;
   }
   if (ch >= 0xD800 && ch <= 0xDFFF) {
