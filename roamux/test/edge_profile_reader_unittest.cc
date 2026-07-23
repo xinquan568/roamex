@@ -114,10 +114,16 @@ TEST_F(EdgeProfileReaderTest, HistorySkipsRowsWithoutALastVisit) {
   WriteHistory(visit);
   AppendHistoryRow("https://never-visited.example.test/x",
                    /*raw_last_visit_time=*/0, /*visit_count=*/0);
+  // FromChromeTime() nulls EVERY non-positive value, not just zero, so a
+  // negative timestamp must be dropped too. Without this row a fix that
+  // filtered the raw column against 0 would pass while still handing
+  // AddPagesWithDetails a null-time row.
+  AppendHistoryRow("https://negative-time.example.test/y",
+                   /*raw_last_visit_time=*/-1, /*visit_count=*/0);
 
   auto rows = EdgeProfileReader(dir()).ReadHistory();
 
-  // The visit-less row is dropped; the real one survives untouched.
+  // Both visit-less rows are dropped; the real one survives untouched.
   ASSERT_EQ(1u, rows.size());
   EXPECT_EQ("https://portal.example.test/dash", rows[0].url.spec());
   EXPECT_EQ(visit, rows[0].last_visit);
