@@ -43,11 +43,6 @@ actions::ActionItem* CollapseActionItem(Browser* browser) {
       browser->browser_actions()->root_action_item());
 }
 
-ui::ImageModel CollapseActionImage(Browser* browser) {
-  actions::ActionItem* item = CollapseActionItem(browser);
-  EXPECT_NE(nullptr, item);
-  return item ? item->GetImage() : ui::ImageModel();
-}
 
 ui::ImageModel IconModel(const gfx::VectorIcon& icon) {
   return ui::ImageModel::FromVectorIcon(icon, ui::kColorIcon);
@@ -424,18 +419,20 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
                        CollapseIconMatchesDockSide) {
   auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
   ASSERT_NE(nullptr, controller);
+  actions::ActionItem* item = CollapseActionItem(browser());
+  ASSERT_NE(nullptr, item);
 
   SetPlacementAndLayout(3);  // right dock
   CollapseAndWait(controller, true);
-  EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
   CollapseAndWait(controller, false);
-  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), item->GetImage());
 
   SetPlacementAndLayout(2);  // left dock — stock rows stay stock
   CollapseAndWait(controller, true);
-  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), item->GetImage());
   CollapseAndWait(controller, false);
-  EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
 }
 
 // roam-206: a live dock-side flip re-derives the icon without a collapse
@@ -444,12 +441,14 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
                        LiveDockSwitchRefreshesCollapseIcon) {
   auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
   ASSERT_NE(nullptr, controller);
+  actions::ActionItem* item = CollapseActionItem(browser());
+  ASSERT_NE(nullptr, item);
   SetPlacementAndLayout(2);
   CollapseAndWait(controller, false);
-  ASSERT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+  ASSERT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
 
   SetPlacementAndLayout(3);  // collapse state untouched
-  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), item->GetImage());
 }
 
 // roam-206: the rule is physical — RTL changes nothing about which side the
@@ -459,19 +458,21 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
                        CollapseIconIsPhysicalUnderRTL) {
   auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
   ASSERT_NE(nullptr, controller);
+  actions::ActionItem* item = CollapseActionItem(browser());
+  ASSERT_NE(nullptr, item);
   base::i18n::ScopedRTLForTesting scoped_rtl(true);
 
   SetPlacementAndLayout(2);  // left
   CollapseAndWait(controller, true);
-  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), item->GetImage());
   CollapseAndWait(controller, false);
-  EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
 
   SetPlacementAndLayout(3);  // right
   CollapseAndWait(controller, true);
-  EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
   CollapseAndWait(controller, false);
-  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), item->GetImage());
 }
 
 // roam-206: a dock-side flip made while an enable-state lock is held must
@@ -480,16 +481,18 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
                        LockedDockSwitchRefreshesIconOnUnlock) {
   auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
   ASSERT_NE(nullptr, controller);
+  actions::ActionItem* item = CollapseActionItem(browser());
+  ASSERT_NE(nullptr, item);
   SetPlacementAndLayout(2);
   CollapseAndWait(controller, false);
-  ASSERT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+  ASSERT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
 
   {
     auto lock = controller->GetEnableStateLock();
     SetPlacementAndLayout(3);  // flip while locked; icon deferred
   }
   base::RunLoop().RunUntilIdle();
-  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), item->GetImage());
 }
 
 // roam-206: with kTabStripPosition OFF the stock expression must be
