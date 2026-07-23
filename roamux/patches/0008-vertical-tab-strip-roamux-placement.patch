@@ -285,35 +285,119 @@ index 1477a4ea0b..e5deeb3bca 100644
        ":tab_model",
        ":tab_strip",
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 3f3758fd03..9cc30e7035 100644
+index 6f2f587..fcdf9d5 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-@@ -730,8 +730,23 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -13,6 +13,7 @@
+ #include "base/trace_event/common/trace_event_common.h"
+ #include "base/trace_event/trace_event.h"
+ #include "build/build_config.h"
++#include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/animation/browser_animation_controller.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/layout_constants.h"
+@@ -22,9 +23,7 @@
+ #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
+ #include "chrome/browser/ui/views/frame/custom_corners_background.h"
+ #include "chrome/browser/ui/views/frame/custom_floating_corner.h"
+-#include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/views/frame/horizontal_tab_strip_region_view.h"
+-#include "roamux/common/tab_strip_placement.h"
+ #include "chrome/browser/ui/views/frame/immersive_mode_controller.h"
+ #include "chrome/browser/ui/views/frame/layout/browser_view_layout_delegate.h"
+ #include "chrome/browser/ui/views/frame/layout/browser_view_layout_impl.h"
+@@ -39,6 +38,7 @@
+ #include "chrome/browser/ui/views/tabs/projects/projects_panel_utils.h"
+ #include "chrome/browser/ui/views/tabs/projects/projects_panel_view.h"
+ #include "components/split_tabs/split_tab_visual_data.h"
++#include "roamux/common/tab_strip_placement.h"
+ #include "ui/base/pointer/touch_ui_controller.h"
+ #include "ui/base/ui_base_features.h"
+ #include "ui/gfx/geometry/outsets.h"
+@@ -94,6 +94,20 @@ void IncreasePaddingToMinimum(BrowserLayoutParams& params, int minimum) {
+ 
+ // Gets the sum of leading and trailing exclusions in `params` for minimum-size
+ // computation.
++// Roamux (roam-205): the strip's LOGICAL dock side — physical placement pref
++// XOR RTL — shared by the horizontal geometry (roam-8/9) and the collapsed
++// vertical offset. False whenever the roamux placement does not drive the
++// display (upstream leading dock).
++bool RoamuxDockRight(const Browser* browser) {
++  const PrefService* const prefs = browser->profile()->GetPrefs();
++  const bool physical_right = roamux::ShouldDockVerticalTabStripRight(prefs);
++  const bool physical_left = roamux::ShouldDockVerticalTabStripLeft(prefs);
++  if (!physical_right && !physical_left) {
++    return false;
++  }
++  return physical_right != base::i18n::IsRTL();
++}
++
+ int GetExclusionWidth(const BrowserLayoutParams& params) {
+   const float width = params.leading_exclusion.content.width() +
+                       params.trailing_exclusion.content.width();
+@@ -507,7 +521,7 @@ gfx::Size BrowserViewTabbedLayoutImpl::GetMinimumMainAreaSize(
+ 
+   int width = std::max({toolbar_size.width(), bookmark_bar_size.width(),
+                         infobar_container_size.width(),
+-                            kContentsContainerMinimumWidth});
++                        kContentsContainerMinimumWidth});
+   const int height = toolbar_size.height() + bookmark_bar_size.height() +
+                      infobar_container_size.height() + contents_size.height();
+ 
+@@ -567,13 +581,21 @@ int BrowserViewTabbedLayoutImpl::GetCollapsedVerticalTabStripRelativeTop(
+     return 0;
+   }
+ 
+-  // If there is no leading exclusion, the tabstrip goes all the way to the top.
+-  if (params.leading_exclusion.IsEmpty()) {
++  // Roamux (roam-205): the offset derives from the exclusion on the strip's
++  // LOGICAL dock edge — a right-docked strip is pushed down by the trailing
++  // exclusion (empty on matching-direction macOS), never by the leading one.
++  const auto& dock_exclusion = RoamuxDockRight(browser())
++                                   ? params.trailing_exclusion
++                                   : params.leading_exclusion;
++
++  // If there is no dock-side exclusion, the tabstrip goes all the way to the
++  // top.
++  if (dock_exclusion.IsEmpty()) {
+     return 0;
+   }
+ 
+   const int exclusion_height =
+-      base::ClampCeil(params.leading_exclusion.ContentWithPadding().height());
++      base::ClampCeil(dock_exclusion.ContentWithPadding().height());
+ 
+   // Try to align with toolbar. But if it's not visible, then don't.
+   if (!delegate().IsToolbarVisible()) {
+@@ -730,13 +752,20 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
          last_vertical_tab_strip_width_ = vertical_tab_strip_width;
        }
  
+-      vertical_tab_strip_bounds =
+-          gfx::Rect(params.visual_client_area.x(),
+-                    params.visual_client_area.y() +
+-                        vertical_tab_strip_animation.top_offset,
+-                    vertical_tab_strip_width,
+-                    params.visual_client_area.height() -
+-                        vertical_tab_strip_animation.top_offset);
 +      // Roamux (roam-8/9): dock on the roamux placement's PHYSICAL side when
 +      // the roamux placement drives the display (upstream pref keeps the
 +      // stock leading dock). ProposedLayout coordinates are logical — they
 +      // mirror under RTL — so the physical side flips here (roam-9 D1).
-+      const PrefService* const roamux_prefs = browser()->profile()->GetPrefs();
-+      const bool roamux_physical_right =
-+          roamux::ShouldDockVerticalTabStripRight(roamux_prefs);
-+      const bool roamux_physical_left =
-+          roamux::ShouldDockVerticalTabStripLeft(roamux_prefs);
-+      bool roamux_dock_right = false;
-+      if (roamux_physical_right || roamux_physical_left) {
-+        roamux_dock_right = roamux_physical_right != base::i18n::IsRTL();
-+      }
-       vertical_tab_strip_bounds =
--          gfx::Rect(params.visual_client_area.x(),
-+          gfx::Rect(roamux_dock_right ? params.visual_client_area.right() -
-+                                            vertical_tab_strip_width
-+                                      : params.visual_client_area.x(),
-                     params.visual_client_area.y() +
-                         vertical_tab_strip_animation.top_offset,
-                     vertical_tab_strip_width,
-@@ -746,7 +761,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
++      const bool roamux_dock_right = RoamuxDockRight(browser());
++      vertical_tab_strip_bounds = gfx::Rect(
++          roamux_dock_right
++              ? params.visual_client_area.right() - vertical_tab_strip_width
++              : params.visual_client_area.x(),
++          params.visual_client_area.y() +
++              vertical_tab_strip_animation.top_offset,
++          vertical_tab_strip_width,
++          params.visual_client_area.height() -
++              vertical_tab_strip_animation.top_offset);
+       // In vertical tabs mode, extra space is allocated next to the top element
+       // to serve as a grab handle, on whatever side the caption buttons are.
+       if (!is_fullscreen(window_state)) {
+@@ -746,7 +775,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
        if (adjust_for_cracking) {
          inset_amount -= 1;
        }
@@ -322,7 +406,7 @@ index 3f3758fd03..9cc30e7035 100644
  
        // Let the vertical tab strip animate out over the content.
        if (vertical_tab_strip_animation.current_motion) {
-@@ -755,11 +770,19 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -755,11 +784,19 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
                  TabStripAnimations::kExpand ||
              vertical_tab_strip_animation.current_motion ==
                  TabStripAnimations::kCollapse;
@@ -330,8 +414,8 @@ index 3f3758fd03..9cc30e7035 100644
 -            0, VerticalTabStripRegionView::kCollapsedWidth, 0, 0));
 +        unclipped_contents_region.Inset(
 +            roamux_dock_right
-+                ? gfx::Insets::TLBR(
-+                      0, 0, 0, VerticalTabStripRegionView::kCollapsedWidth)
++                ? gfx::Insets::TLBR(0, 0, 0,
++                                    VerticalTabStripRegionView::kCollapsedWidth)
 +                : gfx::Insets::TLBR(
 +                      0, VerticalTabStripRegionView::kCollapsedWidth, 0, 0));
        } else {
@@ -339,8 +423,8 @@ index 3f3758fd03..9cc30e7035 100644
 -            0, horizontal_layout.vertical_tab_strip_width, 0, 0));
 +        unclipped_contents_region.Inset(
 +            roamux_dock_right
-+                ? gfx::Insets::TLBR(
-+                      0, 0, 0, horizontal_layout.vertical_tab_strip_width)
++                ? gfx::Insets::TLBR(0, 0, 0,
++                                    horizontal_layout.vertical_tab_strip_width)
 +                : gfx::Insets::TLBR(
 +                      0, horizontal_layout.vertical_tab_strip_width, 0, 0));
        }

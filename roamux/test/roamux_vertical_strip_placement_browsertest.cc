@@ -43,7 +43,6 @@ actions::ActionItem* CollapseActionItem(Browser* browser) {
       browser->browser_actions()->root_action_item());
 }
 
-
 ui::ImageModel IconModel(const gfx::VectorIcon& icon) {
   return ui::ImageModel::FromVectorIcon(icon, ui::kColorIcon);
 }
@@ -531,6 +530,66 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripFlagOffIconTest,
     CollapseAndWait(controller, true);  // re-derive under RTL → open (stock)
     EXPECT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
   }
+}
+
+// roam-205: the collapsed rail's top offset derives from the DOCKED side's
+// caption exclusion. On this frame (matching-direction LTR: leading exclusion
+// nonempty, trailing empty) a right dock collapses flush — same origin as
+// expanded — while a left dock keeps the traffic-light offset.
+IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
+                       CollapsedRightDockRunsToClientTop) {
+  auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_NE(nullptr, controller);
+  SetPlacementAndLayout(3);  // right dock
+  views::View* vertical = vertical_region();
+  ASSERT_NE(nullptr, vertical);
+
+  CollapseAndWait(controller, false);
+  browser_view()->DeprecatedLayoutImmediately();
+  const int expanded_y = BoundsInBrowserView(vertical, browser_view()).y();
+
+  CollapseAndWait(controller, true);
+  browser_view()->DeprecatedLayoutImmediately();
+  EXPECT_EQ(expanded_y, BoundsInBrowserView(vertical, browser_view()).y());
+}
+
+IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
+                       CollapsedLeftDockKeepsCaptionOffset) {
+  auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_NE(nullptr, controller);
+  SetPlacementAndLayout(2);  // left dock
+  views::View* vertical = vertical_region();
+  ASSERT_NE(nullptr, vertical);
+
+  CollapseAndWait(controller, false);
+  browser_view()->DeprecatedLayoutImmediately();
+  const int expanded_y = BoundsInBrowserView(vertical, browser_view()).y();
+
+  CollapseAndWait(controller, true);
+  browser_view()->DeprecatedLayoutImmediately();
+  // The left dock sits below the traffic-light band when collapsed.
+  EXPECT_GT(BoundsInBrowserView(vertical, browser_view()).y(), expanded_y);
+}
+
+// roam-205: with no collapsed offset on the right dock, the top container's
+// leading-margin compensation must not fire — its leading edge stays where
+// the expanded state put it.
+IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
+                       RightDockCollapseKeepsTopContainerLeadingEdge) {
+  auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_NE(nullptr, controller);
+  SetPlacementAndLayout(3);  // right dock
+  views::View* top_container =
+      FindViewByClassName(browser_view(), "TopContainerView");
+  ASSERT_NE(nullptr, top_container);
+
+  CollapseAndWait(controller, false);
+  browser_view()->DeprecatedLayoutImmediately();
+  const int expanded_x = BoundsInBrowserView(top_container, browser_view()).x();
+
+  CollapseAndWait(controller, true);
+  browser_view()->DeprecatedLayoutImmediately();
+  EXPECT_EQ(expanded_x, BoundsInBrowserView(top_container, browser_view()).x());
 }
 
 }  // namespace
