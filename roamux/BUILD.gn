@@ -248,6 +248,7 @@ test("roamux_browsertests") {
     "//third_party/blink/public/common",
     "//third_party/leveldatabase",
     "//ui/base",
+    "//ui/events",
     "//ui/events:test_support",
     "//ui/gfx/codec",
     "//ui/gfx/geometry",

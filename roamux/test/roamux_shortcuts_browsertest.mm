@@ -6,6 +6,8 @@
 #import <Carbon/Carbon.h>
 #import <Cocoa/Cocoa.h>
 
+#include "base/apple/scoped_cftyperef.h"
+#include "base/strings/string_util.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/values.h"
 #include "chrome/app/chrome_command_ids.h"
@@ -21,6 +23,7 @@
 #include "roamux/common/roamux_features.h"
 #include "roamux/common/roamux_prefs.h"
 #include "roamux/test/support/roamux_browser_test.h"
+#include "ui/events/keycodes/keyboard_code_conversion_mac.h"
 #include "ui/events/test/cocoa_test_event_utils.h"
 
 namespace roamux {
@@ -48,6 +51,36 @@ class ExposedHandler : public RoamuxShortcutsHandler {
  public:
   using RoamuxShortcutsHandler::set_web_ui;
 };
+
+// roam-207: the chordText the handler renders for `pref_key`, or "" if absent.
+std::string ChordTextFor(RoamuxShortcutsHandler& handler,
+                         const std::string& pref_key) {
+  base::ListValue list = handler.GetShortcutListForTesting();
+  for (const base::Value& item : list) {
+    const std::string* key = item.GetDict().FindString("key");
+    if (key && *key == pref_key) {
+      const std::string* text = item.GetDict().FindString("chordText");
+      return text ? *text : "";
+    }
+  }
+  return "";
+}
+
+// roam-207 T1 preflight: the exact production translation of `keycode` under
+// the current input source (mirrors ChordKeyDisplayString step 1).
+UniChar TranslateForDisplay(uint16_t keycode, std::string* source_id) {
+  base::apple::ScopedCFTypeRef<TISInputSourceRef> source(
+      TISCopyCurrentKeyboardLayoutInputSource());
+  if (source_id) {
+    NSString* ns_id = (__bridge NSString*)TISGetInputSourceProperty(
+        source.get(), kTISPropertyInputSourceID);
+    *source_id = ns_id ? [ns_id UTF8String] : "<unknown>";
+  }
+  UInt32 dead_key_state = 0;
+  return ui::TranslatedUnicodeCharFromKeyCode(source.get(), keycode,
+                                              kUCKeyActionDisplay, 0,
+                                              LMGetKbdType(), &dead_key_state);
+}
 
 class RoamuxShortcutsTest : public roamux::test::RoamuxBrowserTest {
  public:
@@ -141,6 +174,50 @@ IN_PROC_BROWSER_TEST_F(RoamuxShortcutsFlagOffTest, DispatchInertWhenFlagOff) {
   NSEvent* event = cocoa_test_event_utils::KeyEventWithKeyCode(
       default_chord.keycode, 'r', NSEventTypeKeyDown, modifiers);
   EXPECT_FALSE(CommandForKeyEvent(event).found());
+}
+
+// roam-207: shortcut rows render the KEY character, not the raw keycode.
+IN_PROC_BROWSER_TEST_F(RoamuxShortcutsTest,
+                       DefaultChordTextRendersKeyCharacters) {
+  // Mechanical layout preflight: the literals below assume the builder's
+  // US-ANSI layout; skip loudly (with the observed translations) otherwise.
+  std::string source_id;
+  const UniChar r = TranslateForDisplay(kVK_ANSI_R, &source_id);
+  const UniChar lb = TranslateForDisplay(kVK_ANSI_LeftBracket, nullptr);
+  const UniChar rb = TranslateForDisplay(kVK_ANSI_RightBracket, nullptr);
+  if (r != 'r' || lb != '[' || rb != ']') {
+    GTEST_SKIP() << "non-US-ANSI layout (" << source_id << "): observed U+"
+                 << std::hex << r << "/U+" << lb << "/U+" << rb;
+  }
+
+  content::TestWebUI test_web_ui;
+  test_web_ui.set_web_contents(
+      browser()->tab_strip_model()->GetActiveWebContents());
+  ExposedHandler handler;
+  handler.set_web_ui(&test_web_ui);
+
+  EXPECT_EQ("\xE2\x8C\x83\xE2\x8C\x98R",
+            ChordTextFor(handler, "reload_initial_url"));
+  EXPECT_EQ("\xE2\x8C\x83\xE2\x8C\x98[",
+            ChordTextFor(handler, "tab_visit_back"));
+  EXPECT_EQ("\xE2\x8C\x83\xE2\x8C\x98]",
+            ChordTextFor(handler, "tab_visit_forward"));
+}
+
+// roam-207: an unmappable (function) key renders a NAMED key — never a
+// numeric placeholder.
+IN_PROC_BROWSER_TEST_F(RoamuxShortcutsTest, UnmappableKeycodeRendersNamedKey) {
+  EXPECT_EQ("", Rebind(true, false, true, false, "F5"));
+
+  content::TestWebUI test_web_ui;
+  test_web_ui.set_web_contents(
+      browser()->tab_strip_model()->GetActiveWebContents());
+  ExposedHandler handler;
+  handler.set_web_ui(&test_web_ui);
+
+  const std::string text = ChordTextFor(handler, "reload_initial_url");
+  EXPECT_TRUE(base::EndsWith(text, "F5")) << text;
+  EXPECT_EQ(std::string::npos, text.find('[')) << text;
 }
 
 }  // namespace

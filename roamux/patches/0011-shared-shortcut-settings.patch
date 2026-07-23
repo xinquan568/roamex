@@ -1,14 +1,16 @@
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
-index 63c2601cfc..9eeb9da6c2 100644
+index 63c2601..638ea11 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -4195,6 +4195,11 @@ static_library("browser") {
+@@ -4195,6 +4195,13 @@ static_library("browser") {
        "fullscreen_mac.mm",
        "global_keyboard_shortcuts_mac.h",
        "global_keyboard_shortcuts_mac.mm",
 +      # Roamux (roam-13): the shared shortcut surface (mac-only product).
 +      "//roamux/browser/tabs/shortcut_registry_mac.h",
 +      "//roamux/browser/tabs/shortcut_registry_mac.mm",
++      "//roamux/browser/ui/webui/chord_display.h",
++      "//roamux/browser/ui/webui/chord_display.mm",
 +      "//roamux/browser/ui/webui/roamux_shortcuts_handler.cc",
 +      "//roamux/browser/ui/webui/roamux_shortcuts_handler.h",
        "icon_loader_mac.mm",

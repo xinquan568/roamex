@@ -4,11 +4,11 @@
 #include <string>
 
 #include "base/functional/bind.h"
-#include "base/strings/string_number_conversions.h"
 #include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/web_ui.h"
 #include "roamux/browser/tabs/shortcut_registry.h"
 #include "roamux/browser/tabs/shortcut_registry_mac.h"
+#include "roamux/browser/ui/webui/chord_display.h"
 
 namespace roamux {
 
@@ -28,7 +28,7 @@ std::string ChordDisplayString(const tabs::Chord& chord) {
   if (chord.cmd) {
     text += "\xE2\x8C\x98";  // ⌘
   }
-  text += "[" + base::NumberToString(chord.keycode) + "]";
+  text += ChordKeyDisplayString(chord.keycode);
   return text;
 }
 
