@@ -62,17 +62,20 @@ uint16_t MaskEdgeSecretItemsForUtility(
 
 base::FilePath AppDataRootFromEdgeProfilePath(
     const base::FilePath& source_path) {
-  // source_path == <app_data_root>/Microsoft Edge/Default.
+  // source_path == <app_data_root>/Microsoft Edge/<profile dir> (roam-202:
+  // whatever profile detection selected).
   return source_path.DirName().DirName();
 }
 
 RoamuxEdgeImportDriver::RoamuxEdgeImportDriver(
     Profile* profile,
     base::FilePath app_data_root,
+    base::FilePath profile_dir,
     uint16_t items,
     crypto::apple::KeychainV2* keychain_for_testing)
     : profile_(profile),
       app_data_root_(std::move(app_data_root)),
+      profile_dir_(std::move(profile_dir)),
       items_(items),
       keychain_for_testing_(keychain_for_testing) {}
 
@@ -94,8 +97,9 @@ void RoamuxEdgeImportDriver::Start(
   }
 
   coordinator_ = std::make_unique<RoamuxEdgeImportCoordinator>(
-      app_data_root_, profile_, base::MakeRefCounted<ProfileWriter>(profile_),
-      plan.carriers, keychain_for_testing_);
+      app_data_root_, profile_dir_, profile_,
+      base::MakeRefCounted<ProfileWriter>(profile_), plan.carriers,
+      keychain_for_testing_);
   coordinator_->Run(base::BindOnce(&RoamuxEdgeImportDriver::OnCoordinatorDone,
                                    weak_factory_.GetWeakPtr()));
 }
@@ -117,7 +121,8 @@ bool MaybeStartEdgeBrowserSideImport(
   }
   auto driver = std::make_unique<RoamuxEdgeImportDriver>(
       target_profile,
-      AppDataRootFromEdgeProfilePath(source_profile.source_path), items,
+      AppDataRootFromEdgeProfilePath(source_profile.source_path),
+      source_profile.source_path, items,
       /*keychain_for_testing=*/nullptr);
   RoamuxEdgeImportDriver* driver_raw = driver.get();
   // Keep the driver alive across its async run by owning it in the completion

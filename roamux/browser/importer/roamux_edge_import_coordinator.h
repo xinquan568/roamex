@@ -52,12 +52,14 @@ class RoamuxIndexedDbImportStage;
 class RoamuxEdgeImportCoordinator {
  public:
   // `app_data_root` is the macOS Application-Support root that contains
-  // `Microsoft Edge/`. `profile` is the destination (its path is the
-  // destination profile dir). `writer` is the ProfileWriter secrets are written
-  // through. `carriers` selects which browser-side carriers to import.
-  // `keychain_for_testing` is nullptr in production (forwarded to the secret
-  // stage).
+  // `Microsoft Edge/`. `profile_dir` is the SOURCE profile directory selected
+  // at detection (roam-202: propagated, never re-derived). `profile` is the
+  // destination (its path is the destination profile dir). `writer` is the
+  // ProfileWriter secrets are written through. `carriers` selects which
+  // browser-side carriers to import. `keychain_for_testing` is nullptr in
+  // production (forwarded to the secret stage).
   RoamuxEdgeImportCoordinator(base::FilePath app_data_root,
+                              base::FilePath profile_dir,
                               Profile* profile,
                               scoped_refptr<ProfileWriter> writer,
                               base::flat_set<EdgeCarrier> carriers,
@@ -89,6 +91,7 @@ class RoamuxEdgeImportCoordinator {
   bool Requested(EdgeCarrier carrier) const;
 
   const base::FilePath app_data_root_;
+  const base::FilePath profile_dir_;
   const raw_ptr<Profile> profile_;
   const base::FilePath dest_profile_dir_;
   const scoped_refptr<ProfileWriter> writer_;

@@ -35,7 +35,7 @@ class EdgeImportAdapterTest : public testing::Test {
 
 TEST_F(EdgeImportAdapterTest, ReadsSupported150VersionAndPaths) {
   WriteLastVersion("150.0.3478.97\n");
-  auto adapter = EdgeImportAdapter::Detect(root_.GetPath());
+  auto adapter = EdgeImportAdapter::Detect(root_.GetPath(), ProfileDir());
   ASSERT_TRUE(adapter->version().has_value());
   EXPECT_EQ("150.0.3478.97", adapter->version()->GetString());
   EXPECT_TRUE(adapter->version_supported());
@@ -44,7 +44,7 @@ TEST_F(EdgeImportAdapterTest, ReadsSupported150VersionAndPaths) {
 }
 
 TEST_F(EdgeImportAdapterTest, MissingLastVersionIsUndeterminedFallback) {
-  auto adapter = EdgeImportAdapter::Detect(root_.GetPath());
+  auto adapter = EdgeImportAdapter::Detect(root_.GetPath(), ProfileDir());
   EXPECT_FALSE(adapter->version().has_value());
   EXPECT_FALSE(adapter->version_supported());
   // Still returns a usable adapter with resolved paths (best-effort fallback).
@@ -53,23 +53,49 @@ TEST_F(EdgeImportAdapterTest, MissingLastVersionIsUndeterminedFallback) {
 
 TEST_F(EdgeImportAdapterTest, UnparseableVersionIsUndetermined) {
   WriteLastVersion("not-a-version");
-  auto adapter = EdgeImportAdapter::Detect(root_.GetPath());
+  auto adapter = EdgeImportAdapter::Detect(root_.GetPath(), ProfileDir());
   EXPECT_FALSE(adapter->version().has_value());
   EXPECT_FALSE(adapter->version_supported());
 }
 
 TEST_F(EdgeImportAdapterTest, OtherMilestoneDetectedButUnsupported) {
   WriteLastVersion("152.0.1.2");
-  auto adapter = EdgeImportAdapter::Detect(root_.GetPath());
+  auto adapter = EdgeImportAdapter::Detect(root_.GetPath(), ProfileDir());
   ASSERT_TRUE(adapter->version().has_value());
   EXPECT_FALSE(adapter->version_supported());
+}
+
+// roam-202: the adapter probes the GIVEN profile dir — a Profile 1 layout's
+// carriers are visible when that dir is passed through.
+TEST_F(EdgeImportAdapterTest, ProbesTheGivenProfileDir) {
+  WriteLastVersion("150.0.0.0");
+  const base::FilePath profile1 =
+      UserDataDir().Append(FILE_PATH_LITERAL("Profile 1"));
+  ASSERT_TRUE(base::CreateDirectory(profile1));
+  ASSERT_TRUE(base::WriteFile(
+      profile1.Append(FILE_PATH_LITERAL("Login Data")), "x"));
+
+  auto adapter = EdgeImportAdapter::Detect(root_.GetPath(), profile1);
+  EXPECT_EQ(profile1, adapter->profile_dir());
+  EXPECT_TRUE(adapter->CarrierAvailable(EdgeCarrier::kPasswords));
+}
+
+// roam-202: flat carrier artifacts use PathExists — a directory-shaped
+// "Login Data" reports available (the shared shape rule with the resolver).
+TEST_F(EdgeImportAdapterTest, DirectoryShapedFlatArtifactIsAvailable) {
+  WriteLastVersion("150.0.0.0");
+  ASSERT_TRUE(base::CreateDirectory(
+      ProfileDir().Append(FILE_PATH_LITERAL("Login Data"))));
+
+  auto adapter = EdgeImportAdapter::Detect(root_.GetPath(), ProfileDir());
+  EXPECT_TRUE(adapter->CarrierAvailable(EdgeCarrier::kPasswords));
 }
 
 TEST_F(EdgeImportAdapterTest, CarrierAvailableReflectsSourceShape) {
   WriteLastVersion("150.0.0.0");
   ASSERT_TRUE(base::CreateDirectory(ProfileDir()));
 
-  auto absent = EdgeImportAdapter::Detect(root_.GetPath());
+  auto absent = EdgeImportAdapter::Detect(root_.GetPath(), ProfileDir());
   EXPECT_FALSE(absent->CarrierAvailable(EdgeCarrier::kPasswords));
   EXPECT_FALSE(absent->CarrierAvailable(EdgeCarrier::kCookies));
   EXPECT_FALSE(absent->CarrierAvailable(EdgeCarrier::kLocalStorage));
@@ -86,7 +112,7 @@ TEST_F(EdgeImportAdapterTest, CarrierAvailableReflectsSourceShape) {
   ASSERT_TRUE(base::CreateDirectory(
       ProfileDir().Append(FILE_PATH_LITERAL("IndexedDB"))));
 
-  auto present = EdgeImportAdapter::Detect(root_.GetPath());
+  auto present = EdgeImportAdapter::Detect(root_.GetPath(), ProfileDir());
   EXPECT_TRUE(present->CarrierAvailable(EdgeCarrier::kPasswords));
   EXPECT_TRUE(present->CarrierAvailable(EdgeCarrier::kCookies));
   EXPECT_TRUE(present->CarrierAvailable(EdgeCarrier::kLocalStorage));

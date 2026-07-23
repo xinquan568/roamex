@@ -73,14 +73,15 @@ TEST(RoamuxEdgeImportDriverPlanTest, SourceMaskGatedOnEdgeAndFeature) {
 }
 
 TEST(RoamuxEdgeImportDriverPlanTest, AppDataRootRoundTripsToProfileDir) {
+  // roam-202: source_path is the selected profile — any name, not Default.
   const base::FilePath source_path =
       base::FilePath(FILE_PATH_LITERAL("/Users/x/Library/Application Support"))
           .Append(FILE_PATH_LITERAL("Microsoft Edge"))
-          .Append(FILE_PATH_LITERAL("Default"));
+          .Append(FILE_PATH_LITERAL("Profile 1"));
   const base::FilePath app_data_root =
       AppDataRootFromEdgeProfilePath(source_path);
-  // The adapter re-appends "Microsoft Edge/Default", recovering source_path.
-  auto adapter = EdgeImportAdapter::Detect(app_data_root);
+  // The selected profile propagates; the adapter never re-derives it.
+  auto adapter = EdgeImportAdapter::Detect(app_data_root, source_path);
   EXPECT_EQ(source_path, adapter->profile_dir());
 }
 

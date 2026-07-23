@@ -17,12 +17,23 @@ class FilePath;
 namespace roamux {
 
 // Given a macOS Application-Support root (from DIR_APP_DATA — overridable in
-// tests), returns the SourceProfile for a Chromium-Edge default profile if it
+// tests), returns the SourceProfile for a Chromium-Edge profile if one
 // exists, advertising only the NON-SECRET items (passwords/cookies are
 // roam-16). Pure/hermetic: no flag check, no PathService — the caller
 // (importer_list.cc) owns the kEdgeImport gate. Returns nullopt if absent.
+// The returned source_path is the SINGLE point of profile selection
+// (roam-202): downstream consumers must propagate it, never re-derive it.
 std::optional<user_data_importer::SourceProfile> DetectEdgeSourceProfile(
     const base::FilePath& app_data_root);
+
+// roam-202: resolves which profile directory under `<user_data_dir>` an
+// import should read, the way Edge itself picks its startup profile:
+// Local State's profile.last_used, else its single info_cache entry, else
+// Default, else the lowest-numbered "Profile N" — accepting only candidates
+// that actually hold importable data (any carrier artifact, utility or
+// browser side). Returns an empty path when nothing qualifies. Exposed for
+// tests; production's only caller is DetectEdgeSourceProfile.
+base::FilePath ResolveEdgeProfileDir(const base::FilePath& user_data_dir);
 
 // Pure, side-effect-free reader for a macOS Chromium-Edge (150.x) profile
 // directory (roam-15 / I-3.1). It reads only the NON-SECRET hard-guaranteed

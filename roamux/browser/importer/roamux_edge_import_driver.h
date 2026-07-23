@@ -61,8 +61,11 @@ uint16_t MaskEdgeSecretItemsForUtility(
     uint16_t items);
 
 // The detected Edge SourceProfile::source_path is `<app_data_root>/Microsoft
-// Edge/Default`; the coordinator wants `app_data_root` (it re-appends those two
-// components). Returns `source_path.DirName().DirName()`.
+// Edge/<profile dir>` (roam-202: the profile dir is whatever detection
+// selected — "Default", "Profile 1", …). Returns
+// `source_path.DirName().DirName()`. The root is needed for user-data-level
+// facts (Last Version, SingletonLock); the profile dir itself must be
+// propagated alongside, never re-derived.
 base::FilePath AppDataRootFromEdgeProfilePath(
     const base::FilePath& source_path);
 
@@ -77,6 +80,7 @@ class RoamuxEdgeImportDriver {
  public:
   RoamuxEdgeImportDriver(Profile* profile,
                          base::FilePath app_data_root,
+                         base::FilePath profile_dir,
                          uint16_t items,
                          crypto::apple::KeychainV2* keychain_for_testing);
   RoamuxEdgeImportDriver(const RoamuxEdgeImportDriver&) = delete;
@@ -90,6 +94,9 @@ class RoamuxEdgeImportDriver {
 
   const raw_ptr<Profile> profile_;
   const base::FilePath app_data_root_;
+  // roam-202: the profile dir detection selected (SourceProfile.source_path),
+  // propagated so no downstream stage re-derives it.
+  const base::FilePath profile_dir_;
   const uint16_t items_;
   const raw_ptr<crypto::apple::KeychainV2> keychain_for_testing_;
 

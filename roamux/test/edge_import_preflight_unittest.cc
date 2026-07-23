@@ -8,6 +8,7 @@
 #include "base/containers/flat_set.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "roamux/browser/importer/roamux_edge_import_driver.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace roamux {
@@ -76,8 +77,8 @@ TEST(EdgeImportPreflightTest,
 
   const base::flat_set<EdgeCarrier> carriers = {EdgeCarrier::kIndexedDb,
                                                 EdgeCarrier::kPasswords};
-  EdgeImportPreflightResult result =
-      ComputeEdgeImportPreflight(root.GetPath(), dest.GetPath(), carriers);
+  EdgeImportPreflightResult result = ComputeEdgeImportPreflight(
+      root.GetPath(), profile, dest.GetPath(), carriers);
 
   EXPECT_TRUE(result.version_supported);
   EXPECT_FALSE(result.running.running);
@@ -87,6 +88,33 @@ TEST(EdgeImportPreflightTest,
   EXPECT_FALSE(result.DestInitialized(EdgeCarrier::kIndexedDb));
   // A carrier that wasn't requested defaults to false.
   EXPECT_FALSE(result.SourceAvailable(EdgeCarrier::kCookies));
+}
+
+// roam-202: the profile selected at detection (SourceProfile.source_path) is
+// the profile preflight must probe — composed exactly the way the driver
+// does it. A Profile 1-only install (no Default) must not be re-derived away.
+TEST(EdgeImportPreflightTest, PreflightFollowsSelectedProfile) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  const base::FilePath user_data =
+      app_data.GetPath().Append(FILE_PATH_LITERAL("Microsoft Edge"));
+  const base::FilePath profile1 =
+      user_data.Append(FILE_PATH_LITERAL("Profile 1"));
+  ASSERT_TRUE(base::CreateDirectory(profile1));
+  ASSERT_TRUE(
+      base::WriteFile(profile1.Append(FILE_PATH_LITERAL("Login Data")), "x"));
+  ASSERT_TRUE(base::WriteFile(
+      user_data.Append(FILE_PATH_LITERAL("Last Version")), "150.0.0.0"));
+  base::ScopedTempDir dest;
+  ASSERT_TRUE(dest.CreateUniqueTempDir());
+
+  const base::FilePath root = AppDataRootFromEdgeProfilePath(profile1);
+  ASSERT_EQ(app_data.GetPath(), root);
+  EdgeImportPreflightResult result = ComputeEdgeImportPreflight(
+      root, profile1, dest.GetPath(), {EdgeCarrier::kPasswords});
+
+  EXPECT_EQ(profile1, result.profile_dir);
+  EXPECT_TRUE(result.SourceAvailable(EdgeCarrier::kPasswords));
 }
 
 }  // namespace

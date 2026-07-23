@@ -5,6 +5,7 @@
 
 #include "roamux/utility/importer/edge_profile_reader.h"
 
+#include "base/check.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/strings/string_number_conversions.h"
@@ -248,6 +249,45 @@ TEST_F(EdgeProfileReaderTest, CopyToTempLeavesSourceUntouched) {
 namespace roamux {
 namespace {
 
+// roam-202 fixture: builds `<root>/Microsoft Edge/<profile…>` trees with
+// arbitrary profile-dir names, per-artifact data, and an optional Local State.
+class EdgeLayoutBuilder {
+ public:
+  explicit EdgeLayoutBuilder(const base::FilePath& app_data_root)
+      : user_data_(
+            app_data_root.Append(FILE_PATH_LITERAL("Microsoft Edge"))) {
+    CHECK(base::CreateDirectory(user_data_));
+  }
+
+  base::FilePath AddProfile(const std::string& name) {
+    const base::FilePath dir =
+        user_data_.Append(base::FilePath::FromUTF8Unsafe(name));
+    CHECK(base::CreateDirectory(dir));
+    return dir;
+  }
+
+  // A profile with one recognizable artifact (Bookmarks).
+  base::FilePath AddPopulatedProfile(const std::string& name) {
+    const base::FilePath dir = AddProfile(name);
+    CHECK(base::WriteFile(dir.Append(FILE_PATH_LITERAL("Bookmarks")), "{}"));
+    return dir;
+  }
+
+  void WriteLocalState(const std::string& contents) {
+    CHECK(base::WriteFile(user_data_.Append(FILE_PATH_LITERAL("Local State")),
+                          contents));
+  }
+
+  const base::FilePath& user_data() const { return user_data_; }
+
+ private:
+  base::FilePath user_data_;
+};
+
+std::string LocalStateWithLastUsed(const std::string& name) {
+  return R"({"profile":{"last_used":")" + name + R"("}})";
+}
+
 TEST(EdgeDetectionTest, PresentWithFourNonSecretBitsWhenDirExists) {
   base::ScopedTempDir app_data;
   ASSERT_TRUE(app_data.CreateUniqueTempDir());
@@ -256,6 +296,11 @@ TEST(EdgeDetectionTest, PresentWithFourNonSecretBitsWhenDirExists) {
           .Append(FILE_PATH_LITERAL("Microsoft Edge"))
           .Append(FILE_PATH_LITERAL("Default"));
   ASSERT_TRUE(base::CreateDirectory(edge_default));
+  // roam-202: detection now requires recognizable profile data, so the
+  // back-compat Default profile carries one artifact.
+  ASSERT_TRUE(
+      base::WriteFile(edge_default.Append(FILE_PATH_LITERAL("Bookmarks")),
+                      "{}"));
 
   std::optional<user_data_importer::SourceProfile> profile =
       DetectEdgeSourceProfile(app_data.GetPath());
@@ -275,6 +320,230 @@ TEST(EdgeDetectionTest, AbsentWhenDirMissing) {
   base::ScopedTempDir app_data;
   ASSERT_TRUE(app_data.CreateUniqueTempDir());
   EXPECT_FALSE(DetectEdgeSourceProfile(app_data.GetPath()).has_value());
+}
+
+// roam-202 T1: the reported real-machine layout — a populated "Profile 1",
+// Local State naming it, and no "Default" at all.
+TEST(EdgeDetectionTest, LastUsedProfileOneDetected) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  const base::FilePath profile1 = edge.AddPopulatedProfile("Profile 1");
+  edge.WriteLocalState(LocalStateWithLastUsed("Profile 1"));
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(profile1, profile->source_path);
+}
+
+// roam-202 T2: last_used is authoritative, not directory order.
+TEST(EdgeDetectionTest, LastUsedBeatsAlphabetical) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  edge.AddPopulatedProfile("Profile 1");
+  const base::FilePath profile2 = edge.AddPopulatedProfile("Profile 2");
+  edge.WriteLocalState(LocalStateWithLastUsed("Profile 2"));
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(profile2, profile->source_path);
+}
+
+// roam-202 T3: unreadable Local State falls back to a populated Default.
+TEST(EdgeDetectionTest, MalformedLocalStateFallsBack) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  const base::FilePath def = edge.AddPopulatedProfile("Default");
+  edge.WriteLocalState("not json at all {{{");
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(def, profile->source_path);
+}
+
+// roam-202 T4: a Local State beyond the size cap is treated as unreadable.
+TEST(EdgeDetectionTest, OversizedLocalStateIgnored) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  const base::FilePath def = edge.AddPopulatedProfile("Default");
+  edge.WriteLocalState(LocalStateWithLastUsed("Default") +
+                       std::string(2 * 1024 * 1024, ' '));
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(def, profile->source_path);
+}
+
+// roam-202 T5: a traversal-shaped last_used must not escape the user-data
+// root, even when a populated directory exists at exactly that relative path.
+TEST(EdgeDetectionTest, TraversalDecoyNotFollowed) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  // The decoy: `<user_data>/../evil` == `<app_data>/evil`, populated.
+  const base::FilePath decoy = app_data.GetPath().Append(
+      FILE_PATH_LITERAL("evil"));
+  ASSERT_TRUE(base::CreateDirectory(decoy));
+  ASSERT_TRUE(
+      base::WriteFile(decoy.Append(FILE_PATH_LITERAL("Bookmarks")), "{}"));
+  const base::FilePath profile1 = edge.AddPopulatedProfile("Profile 1");
+  edge.WriteLocalState(LocalStateWithLastUsed("../evil"));
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(profile1, profile->source_path);
+}
+
+// roam-202 T6: a bare Default directory with no data is not an install.
+TEST(EdgeDetectionTest, BareDefaultNotDetected) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  edge.AddProfile("Default");
+
+  EXPECT_FALSE(DetectEdgeSourceProfile(app_data.GetPath()).has_value());
+}
+
+// roam-202 T7: without Local State the scan picks the lowest profile number,
+// numerically — Profile 2 before Profile 10.
+TEST(EdgeDetectionTest, ScanOrderNumericAscending) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  edge.AddPopulatedProfile("Profile 10");
+  const base::FilePath profile2 = edge.AddPopulatedProfile("Profile 2");
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(profile2, profile->source_path);
+}
+
+// roam-202 T8: equal numeric suffixes tie-break by full-name lexicographic
+// order — "Profile 02" before "Profile 2".
+TEST(EdgeDetectionTest, ScanTieBreakLexicalOnEqualSuffix) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  edge.AddPopulatedProfile("Profile 2");
+  const base::FilePath profile02 = edge.AddPopulatedProfile("Profile 02");
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(profile02, profile->source_path);
+}
+
+// roam-202 T9: no last_used, exactly one info_cache entry — that entry wins.
+TEST(EdgeDetectionTest, InfoCacheSingleEntryFallback) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  const base::FilePath profile1 = edge.AddPopulatedProfile("Profile 1");
+  edge.WriteLocalState(
+      R"({"profile":{"info_cache":{"Profile 1":{"name":"Personal"}}}})");
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(profile1, profile->source_path);
+}
+
+// roam-202 T10: a last_used naming a missing directory falls through to the
+// info_cache entry.
+TEST(EdgeDetectionTest, DanglingLastUsedFallsThrough) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  const base::FilePath profile1 = edge.AddPopulatedProfile("Profile 1");
+  edge.WriteLocalState(
+      R"({"profile":{"last_used":"Profile 7",)"
+      R"("info_cache":{"Profile 1":{"name":"Personal"}}}})");
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(profile1, profile->source_path);
+}
+
+// roam-202 T11: a non-string last_used is ignored, not crashed on.
+TEST(EdgeDetectionTest, WrongTypeLastUsedFallsThrough) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  const base::FilePath def = edge.AddPopulatedProfile("Default");
+  edge.WriteLocalState(R"({"profile":{"last_used":42}})");
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(def, profile->source_path);
+}
+
+// roam-202 T12: every carrier artifact — utility and browser side — counts as
+// recognizable profile data on its own.
+TEST(EdgeDetectionTest, EachArtifactAloneIsRecognized) {
+  struct Artifact {
+    const base::FilePath::CharType* first;
+    const base::FilePath::CharType* second;  // nullptr = single component
+    bool is_dir;
+  };
+  constexpr Artifact kArtifacts[] = {
+      {FILE_PATH_LITERAL("Bookmarks"), nullptr, false},
+      {FILE_PATH_LITERAL("History"), nullptr, false},
+      {FILE_PATH_LITERAL("Web Data"), nullptr, false},
+      {FILE_PATH_LITERAL("Login Data"), nullptr, false},
+      {FILE_PATH_LITERAL("Cookies"), nullptr, false},
+      {FILE_PATH_LITERAL("Local Storage"), FILE_PATH_LITERAL("leveldb"), true},
+      {FILE_PATH_LITERAL("IndexedDB"), nullptr, true},
+  };
+  for (const Artifact& artifact : kArtifacts) {
+    SCOPED_TRACE(base::FilePath(artifact.first).AsUTF8Unsafe());
+    base::ScopedTempDir app_data;
+    ASSERT_TRUE(app_data.CreateUniqueTempDir());
+    EdgeLayoutBuilder edge(app_data.GetPath());
+    const base::FilePath profile1 = edge.AddProfile("Profile 1");
+    base::FilePath target = profile1.Append(artifact.first);
+    if (artifact.second) {
+      target = target.Append(artifact.second);
+    }
+    if (artifact.is_dir) {
+      ASSERT_TRUE(base::CreateDirectory(target));
+    } else {
+      ASSERT_TRUE(base::WriteFile(target, "x"));
+    }
+    edge.WriteLocalState(LocalStateWithLastUsed("Profile 1"));
+
+    std::optional<user_data_importer::SourceProfile> profile =
+        DetectEdgeSourceProfile(app_data.GetPath());
+    ASSERT_TRUE(profile.has_value());
+    EXPECT_EQ(profile1, profile->source_path);
+  }
+}
+
+// roam-202 T13: flat artifacts are checked with PathExists (the adapter's
+// CarrierAvailable rule) — a directory-shaped "Login Data" counts.
+TEST(EdgeDetectionTest, DirectoryShapedFlatArtifactCounts) {
+  base::ScopedTempDir app_data;
+  ASSERT_TRUE(app_data.CreateUniqueTempDir());
+  EdgeLayoutBuilder edge(app_data.GetPath());
+  const base::FilePath profile1 = edge.AddProfile("Profile 1");
+  ASSERT_TRUE(base::CreateDirectory(
+      profile1.Append(FILE_PATH_LITERAL("Login Data"))));
+  edge.WriteLocalState(LocalStateWithLastUsed("Profile 1"));
+
+  std::optional<user_data_importer::SourceProfile> profile =
+      DetectEdgeSourceProfile(app_data.GetPath());
+  ASSERT_TRUE(profile.has_value());
+  EXPECT_EQ(profile1, profile->source_path);
 }
 
 }  // namespace

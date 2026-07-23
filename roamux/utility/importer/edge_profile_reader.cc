@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "roamux/utility/importer/edge_profile_reader.h"
 
+#include <algorithm>
+#include <limits>
+#include <string>
 #include <utility>
+#include <vector>
 
+#include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/json/json_reader.h"
+#include "base/strings/string_util.h"
 #include "base/logging.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
@@ -131,14 +137,131 @@ void CollectRoot(const base::DictValue& root,
   }
 }
 
+// roam-202: a candidate profile counts only if it holds at least one artifact
+// an import stage can read — the full utility + browser carrier surface. Flat
+// artifacts are checked with PathExists, the same shape rule
+// EdgeImportAdapter::CarrierAvailable applies to Login Data / Cookies.
+bool HasEdgeProfileData(const base::FilePath& dir) {
+  static constexpr const base::FilePath::CharType* kFlatArtifacts[] = {
+      FILE_PATH_LITERAL("Bookmarks"),  FILE_PATH_LITERAL("History"),
+      FILE_PATH_LITERAL("Web Data"),   FILE_PATH_LITERAL("Login Data"),
+      FILE_PATH_LITERAL("Cookies"),
+  };
+  for (const auto* artifact : kFlatArtifacts) {
+    if (base::PathExists(dir.Append(artifact))) {
+      return true;
+    }
+  }
+  return base::DirectoryExists(dir.Append(FILE_PATH_LITERAL("Local Storage"))
+                                   .Append(FILE_PATH_LITERAL("leveldb"))) ||
+         base::DirectoryExists(dir.Append(FILE_PATH_LITERAL("IndexedDB")));
+}
+
+// A Local State profile reference is usable only as a single well-formed path
+// component — the resolved directory must stay a direct child of the
+// user-data dir. Local State is external, user-controlled input.
+bool IsSafeProfileName(const std::string& name) {
+  return !name.empty() && name != "." && name != ".." &&
+         name.find('/') == std::string::npos &&
+         name.find('\\') == std::string::npos;
+}
+
+// Size cap for the Local State read: profile metadata fits comfortably; an
+// oversized file is treated as unreadable rather than parsed.
+constexpr size_t kMaxLocalStateBytes = 1024 * 1024;
+
+std::optional<base::DictValue> ReadLocalState(
+    const base::FilePath& user_data_dir) {
+  std::string contents;
+  if (!base::ReadFileToStringWithMaxSize(
+          user_data_dir.Append(FILE_PATH_LITERAL("Local State")), &contents,
+          kMaxLocalStateBytes)) {
+    return std::nullopt;
+  }
+  return base::JSONReader::ReadDict(contents, base::JSON_PARSE_RFC);
+}
+
+// Scan comparator: "Profile N" sorts by N ascending; equal suffixes tie-break
+// by full-name lexicographic order; names without a parseable suffix sort
+// after all numeric ones.
+std::pair<int64_t, std::string> ProfileScanKey(const base::FilePath& dir) {
+  const std::string name = dir.BaseName().AsUTF8Unsafe();
+  int64_t number = std::numeric_limits<int64_t>::max();
+  constexpr std::string_view kPrefix = "Profile ";
+  if (base::StartsWith(name, kPrefix)) {
+    int64_t parsed = 0;
+    if (base::StringToInt64(name.substr(kPrefix.size()), &parsed)) {
+      number = parsed;
+    }
+  }
+  return {number, name};
+}
+
 }  // namespace
+
+base::FilePath ResolveEdgeProfileDir(const base::FilePath& user_data_dir) {
+  auto usable = [&user_data_dir](const std::string& name) -> base::FilePath {
+    if (!IsSafeProfileName(name)) {
+      return base::FilePath();
+    }
+    const base::FilePath dir =
+        user_data_dir.Append(base::FilePath::FromUTF8Unsafe(name));
+    if (base::DirectoryExists(dir) && HasEdgeProfileData(dir)) {
+      return dir;
+    }
+    return base::FilePath();
+  };
+
+  // (1) Local State: profile.last_used, then (2) a sole info_cache entry.
+  if (std::optional<base::DictValue> local_state =
+          ReadLocalState(user_data_dir)) {
+    if (const base::DictValue* profile = local_state->FindDict("profile")) {
+      if (const std::string* last_used = profile->FindString("last_used")) {
+        if (base::FilePath dir = usable(*last_used); !dir.empty()) {
+          return dir;
+        }
+      }
+      if (const base::DictValue* cache = profile->FindDict("info_cache");
+          cache && cache->size() == 1) {
+        if (base::FilePath dir = usable(cache->begin()->first); !dir.empty()) {
+          return dir;
+        }
+      }
+    }
+  }
+
+  // (3) The historical Default layout.
+  const base::FilePath default_dir =
+      user_data_dir.Append(FILE_PATH_LITERAL("Default"));
+  if (base::DirectoryExists(default_dir) && HasEdgeProfileData(default_dir)) {
+    return default_dir;
+  }
+
+  // (4) Deterministic "Profile *" scan.
+  std::vector<base::FilePath> candidates;
+  base::FileEnumerator scan(user_data_dir, /*recursive=*/false,
+                            base::FileEnumerator::DIRECTORIES,
+                            FILE_PATH_LITERAL("Profile *"));
+  for (base::FilePath dir = scan.Next(); !dir.empty(); dir = scan.Next()) {
+    candidates.push_back(dir);
+  }
+  std::sort(candidates.begin(), candidates.end(),
+            [](const base::FilePath& a, const base::FilePath& b) {
+              return ProfileScanKey(a) < ProfileScanKey(b);
+            });
+  for (const base::FilePath& dir : candidates) {
+    if (HasEdgeProfileData(dir)) {
+      return dir;
+    }
+  }
+  return base::FilePath();
+}
 
 std::optional<user_data_importer::SourceProfile> DetectEdgeSourceProfile(
     const base::FilePath& app_data_root) {
-  const base::FilePath profile_dir =
-      app_data_root.Append(FILE_PATH_LITERAL("Microsoft Edge"))
-          .Append(FILE_PATH_LITERAL("Default"));
-  if (!base::PathExists(profile_dir)) {
+  const base::FilePath profile_dir = ResolveEdgeProfileDir(
+      app_data_root.Append(FILE_PATH_LITERAL("Microsoft Edge")));
+  if (profile_dir.empty()) {
     return std::nullopt;
   }
   user_data_importer::SourceProfile edge;

@@ -151,9 +151,12 @@ class RoamuxEdgeImportCoordinatorTestBase
   EdgeImportReport RunCoordinator(const base::FilePath& app_data_root,
                                   base::flat_set<EdgeCarrier> carriers) {
     auto writer = base::MakeRefCounted<ProfileWriter>(browser()->profile());
+    // roam-202: these fixtures build Default trees; the coordinator now takes
+    // the selected source profile dir explicitly.
     RoamuxEdgeImportCoordinator coordinator(
-        app_data_root, browser()->profile(), std::move(writer),
-        std::move(carriers), /*keychain_for_testing=*/nullptr);
+        app_data_root, EdgeDefaultDir(app_data_root), browser()->profile(),
+        std::move(writer), std::move(carriers),
+        /*keychain_for_testing=*/nullptr);
     base::test::TestFuture<EdgeImportReport> future;
     coordinator.Run(future.GetCallback());
     EXPECT_TRUE(future.Wait());

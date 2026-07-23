@@ -96,9 +96,15 @@ class RoamuxEdgeImportDriverTestBase : public roamux::test::RoamuxBrowserTest {
   }
 
   void SnapshotEdge(const base::FilePath& app_data_root) {
+    SnapshotEdgeInto(app_data_root, EdgeDefaultDir(app_data_root));
+  }
+
+  // roam-202: seeds an arbitrary profile directory, so a test can build the
+  // Profile 1-only layout the selected-profile propagation must honor.
+  void SnapshotEdgeInto(const base::FilePath& app_data_root,
+                        const base::FilePath& dst) {
     base::ScopedAllowBlockingForTesting allow_blocking;
     const base::FilePath src = browser()->profile()->GetPath();
-    const base::FilePath dst = EdgeDefaultDir(app_data_root);
     ASSERT_TRUE(base::CreateDirectory(dst));
     ASSERT_TRUE(base::CopyDirectory(
         src.Append(FILE_PATH_LITERAL("Local Storage")),
@@ -134,8 +140,10 @@ class RoamuxEdgeImportDriverTestBase : public roamux::test::RoamuxBrowserTest {
   }
 
   EdgeImportReport RunDriver(const base::FilePath& app_data_root,
+                             const base::FilePath& profile_dir,
                              uint16_t items) {
-    RoamuxEdgeImportDriver driver(browser()->profile(), app_data_root, items,
+    RoamuxEdgeImportDriver driver(browser()->profile(), app_data_root,
+                                  profile_dir, items,
                                   /*keychain_for_testing=*/nullptr);
     base::test::TestFuture<EdgeImportReport> future;
     driver.Start(future.GetCallback());
@@ -168,8 +176,9 @@ IN_PROC_BROWSER_TEST_F(RoamuxEdgeImportDriverTest,
   ClearOriginStorage(origin);
 
   // Only non-secret items selected; the driver always imports origin storage.
-  EdgeImportReport report =
-      RunDriver(edge.GetPath(), user_data_importer::HISTORY);
+  EdgeImportReport report = RunDriver(edge.GetPath(),
+                                      EdgeDefaultDir(edge.GetPath()),
+                                      user_data_importer::HISTORY);
 
   ASSERT_TRUE(report.Find(EdgeCarrier::kLocalStorage));
   EXPECT_EQ(CarrierStatus::kImported,
@@ -182,6 +191,35 @@ IN_PROC_BROWSER_TEST_F(RoamuxEdgeImportDriverTest,
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), origin));
   EXPECT_EQ("lsval", content::EvalJs(web(), "localStorage.getItem('auth')"));
   EXPECT_EQ("idbval", content::EvalJs(web(), kReadIdbJs));
+}
+
+// roam-202: a Profile 1-only install (no Default) must import from the
+// selected profile — the driver follows SourceProfile.source_path instead of
+// re-deriving Default.
+IN_PROC_BROWSER_TEST_F(RoamuxEdgeImportDriverTest,
+                       ImportsFromSelectedProfileOneLayout) {
+  base::ScopedAllowBlockingForTesting allow_blocking;
+  const GURL origin = embedded_test_server()->GetURL("/title1.html");
+  SeedOriginStorage(origin);
+
+  base::ScopedTempDir edge;
+  ASSERT_TRUE(edge.CreateUniqueTempDir());
+  const base::FilePath profile1 =
+      edge.GetPath()
+          .Append(FILE_PATH_LITERAL("Microsoft Edge"))
+          .Append(FILE_PATH_LITERAL("Profile 1"));
+  SnapshotEdgeInto(edge.GetPath(), profile1);
+  ClearOriginStorage(origin);
+
+  EdgeImportReport report =
+      RunDriver(edge.GetPath(), profile1, user_data_importer::HISTORY);
+
+  ASSERT_TRUE(report.Find(EdgeCarrier::kLocalStorage));
+  EXPECT_EQ(CarrierStatus::kImported,
+            report.Find(EdgeCarrier::kLocalStorage)->status);
+  ASSERT_TRUE(report.Find(EdgeCarrier::kIndexedDb));
+  EXPECT_EQ(CarrierStatus::kImported,
+            report.Find(EdgeCarrier::kIndexedDb)->status);
 }
 
 // When PASSWORDS|COOKIES are selected they are HANDLED (reported), not silently
@@ -200,7 +238,8 @@ IN_PROC_BROWSER_TEST_F(RoamuxEdgeImportDriverTest,
   const uint16_t items = user_data_importer::HISTORY |
                          user_data_importer::PASSWORDS |
                          user_data_importer::COOKIES;
-  EdgeImportReport report = RunDriver(edge.GetPath(), items);
+  EdgeImportReport report =
+      RunDriver(edge.GetPath(), EdgeDefaultDir(edge.GetPath()), items);
 
   // The secret carriers appear in the report (handled, not skipped); with no
   // source secrets they are unsupported — never dropped.
@@ -234,7 +273,8 @@ IN_PROC_BROWSER_TEST_F(RoamuxEdgeImportDriverDisabledTest,
   ASSERT_TRUE(edge.CreateUniqueTempDir());
 
   EdgeImportReport report =
-      RunDriver(edge.GetPath(), user_data_importer::PASSWORDS);
+      RunDriver(edge.GetPath(), EdgeDefaultDir(edge.GetPath()),
+                user_data_importer::PASSWORDS);
   ASSERT_TRUE(report.Find(EdgeCarrier::kIndexedDb));
   EXPECT_EQ(CarrierStatus::kFeatureDisabled,
             report.Find(EdgeCarrier::kIndexedDb)->status);

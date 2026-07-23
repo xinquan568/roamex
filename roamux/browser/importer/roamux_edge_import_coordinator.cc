@@ -22,11 +22,13 @@ namespace roamux {
 
 RoamuxEdgeImportCoordinator::RoamuxEdgeImportCoordinator(
     base::FilePath app_data_root,
+    base::FilePath profile_dir,
     Profile* profile,
     scoped_refptr<ProfileWriter> writer,
     base::flat_set<EdgeCarrier> carriers,
     crypto::apple::KeychainV2* keychain_for_testing)
     : app_data_root_(std::move(app_data_root)),
+      profile_dir_(std::move(profile_dir)),
       profile_(profile),
       dest_profile_dir_(profile->GetPath()),
       writer_(std::move(writer)),
@@ -59,7 +61,7 @@ void RoamuxEdgeImportCoordinator::Run(
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
       base::BindOnce(&ComputeEdgeImportPreflight, app_data_root_,
-                     dest_profile_dir_, carriers_),
+                     profile_dir_, dest_profile_dir_, carriers_),
       base::BindOnce(&RoamuxEdgeImportCoordinator::OnPreflightDone,
                      weak_factory_.GetWeakPtr()));
 }

@@ -78,10 +78,11 @@ bool DestCarrierInitialized(const base::FilePath& dest_profile_dir,
 
 EdgeImportPreflightResult ComputeEdgeImportPreflight(
     const base::FilePath& app_data_root,
+    const base::FilePath& profile_dir,
     const base::FilePath& dest_profile_dir,
     const base::flat_set<EdgeCarrier>& carriers) {
   std::unique_ptr<EdgeImportAdapter> adapter =
-      EdgeImportAdapter::Detect(app_data_root);
+      EdgeImportAdapter::Detect(app_data_root, profile_dir);
 
   EdgeImportPreflightResult result;
   result.user_data_dir = adapter->user_data_dir();

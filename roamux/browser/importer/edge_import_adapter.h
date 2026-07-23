@@ -33,12 +33,16 @@ class EdgeImportAdapter {
   // The Edge major-milestone family this build's adapter targets.
   static constexpr uint32_t kSupportedMilestone = 150;
 
-  // Locates `<app_data_root>/Microsoft Edge` (+ `/Default`), detects the
-  // version, and returns an adapter. Always returns a non-null adapter — even
-  // when the version is undetermined or outside the supported family — so the
-  // import flow can best-effort and report, rather than aborting.
+  // Locates `<app_data_root>/Microsoft Edge`, detects the version, and
+  // returns an adapter probing `profile_dir` — the SOURCE profile directory
+  // selected at detection (roam-202: SourceProfile.source_path is the single
+  // point of profile selection; this adapter never re-derives it). Always
+  // returns a non-null adapter — even when the version is undetermined or
+  // outside the supported family — so the import flow can best-effort and
+  // report, rather than aborting.
   static std::unique_ptr<EdgeImportAdapter> Detect(
-      const base::FilePath& app_data_root);
+      const base::FilePath& app_data_root,
+      const base::FilePath& profile_dir);
 
   EdgeImportAdapter(const EdgeImportAdapter&) = delete;
   EdgeImportAdapter& operator=(const EdgeImportAdapter&) = delete;

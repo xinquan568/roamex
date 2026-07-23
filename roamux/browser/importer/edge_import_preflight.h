@@ -72,6 +72,7 @@ struct EdgeImportPreflightResult {
 // writes).
 EdgeImportPreflightResult ComputeEdgeImportPreflight(
     const base::FilePath& app_data_root,
+    const base::FilePath& profile_dir,
     const base::FilePath& dest_profile_dir,
     const base::flat_set<EdgeCarrier>& carriers);
 

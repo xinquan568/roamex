@@ -15,8 +15,6 @@ namespace {
 // The Edge macOS User-Data root under the Application-Support directory.
 constexpr base::FilePath::CharType kEdgeUserData[] =
     FILE_PATH_LITERAL("Microsoft Edge");
-constexpr base::FilePath::CharType kDefaultProfile[] =
-    FILE_PATH_LITERAL("Default");
 constexpr base::FilePath::CharType kLastVersion[] =
     FILE_PATH_LITERAL("Last Version");
 
@@ -39,15 +37,16 @@ std::optional<base::Version> DetectEdgeVersion(
 
 // static
 std::unique_ptr<EdgeImportAdapter> EdgeImportAdapter::Detect(
-    const base::FilePath& app_data_root) {
+    const base::FilePath& app_data_root,
+    const base::FilePath& profile_dir) {
   base::FilePath user_data_dir = app_data_root.Append(kEdgeUserData);
-  base::FilePath profile_dir = user_data_dir.Append(kDefaultProfile);
   std::optional<base::Version> version = DetectEdgeVersion(user_data_dir);
   const bool supported = version.has_value() &&
                          !version->components().empty() &&
                          version->components()[0] == kSupportedMilestone;
-  return base::WrapUnique(new EdgeImportAdapter(
-      std::move(user_data_dir), std::move(profile_dir), version, supported));
+  return base::WrapUnique(new EdgeImportAdapter(std::move(user_data_dir),
+                                                profile_dir, version,
+                                                supported));
 }
 
 EdgeImportAdapter::EdgeImportAdapter(base::FilePath user_data_dir,
