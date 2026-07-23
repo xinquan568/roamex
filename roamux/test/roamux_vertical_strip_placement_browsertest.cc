@@ -7,10 +7,14 @@
 #include <string_view>
 
 #include "base/functional/bind.h"
+#include "base/i18n/rtl.h"
 #include "base/run_loop.h"
+#include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/actions/chrome_action_id.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_actions.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
@@ -22,10 +26,39 @@
 #include "roamux/common/roamux_features.h"
 #include "roamux/common/roamux_prefs.h"
 #include "roamux/test/support/roamux_browser_test.h"
+#include "ui/actions/actions.h"
+#include "ui/base/models/image_model.h"
+#include "ui/color/color_id.h"
+#include "ui/views/vector_icons.h"
 #include "ui/views/view.h"
 
 namespace roamux {
 namespace {
+
+// roam-206: the collapse action's current image, and the ImageModel
+// UpdateCollapseActionItem builds for a given icon.
+ui::ImageModel CollapseActionImage(Browser* browser) {
+  actions::ActionItem* item = actions::ActionManager::Get().FindAction(
+      kActionToggleCollapseVertical,
+      browser->browser_actions()->root_action_item());
+  return item ? item->GetImage() : ui::ImageModel();
+}
+
+ui::ImageModel IconModel(const gfx::VectorIcon& icon) {
+  return ui::ImageModel::FromVectorIcon(icon, ui::kColorIcon);
+}
+
+// Drives collapse through the public RequestCollapse round-trip (the
+// delegate animates, then commits) — the upstream browsertest pattern.
+void CollapseAndWait(::tabs::VerticalTabStripStateController* controller,
+                     bool collapsed) {
+  if (controller->IsCollapsed() == collapsed) {
+    return;
+  }
+  controller->RequestCollapse(collapsed);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&]() { return controller->IsCollapsed() == collapsed; }));
+}
 
 views::View* FindViewByClassName(views::View* root, std::string_view name) {
   if (root->GetClassName() == name) {
@@ -378,6 +411,121 @@ IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripUpstreamPrecedenceTest,
   EXPECT_TRUE(vertical->GetVisible());
   EXPECT_EQ(bv->GetLocalBounds().right(),
             BoundsInBrowserView(vertical, bv).right());
+}
+
+// roam-206: the collapse toggle's arrow points toward where the panel will
+// move — open-icon iff collapsed == docked-right (physical rule).
+IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
+                       CollapseIconMatchesDockSide) {
+  auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_NE(nullptr, controller);
+
+  SetPlacementAndLayout(3);  // right dock
+  CollapseAndWait(controller, true);
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+  CollapseAndWait(controller, false);
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+
+  SetPlacementAndLayout(2);  // left dock — stock rows stay stock
+  CollapseAndWait(controller, true);
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+  CollapseAndWait(controller, false);
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+}
+
+// roam-206: a live dock-side flip re-derives the icon without a collapse
+// transition (OnRoamuxPlacementChanged's same-display-mode path).
+IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
+                       LiveDockSwitchRefreshesCollapseIcon) {
+  auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_NE(nullptr, controller);
+  SetPlacementAndLayout(2);
+  CollapseAndWait(controller, false);
+  ASSERT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+
+  SetPlacementAndLayout(3);  // collapse state untouched
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+}
+
+// roam-206: the rule is physical — RTL changes nothing about which side the
+// panel moves toward. The left-dock rows are where stock and physical
+// genuinely diverge; the right-dock rows coincide with stock (pins).
+IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
+                       CollapseIconIsPhysicalUnderRTL) {
+  auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_NE(nullptr, controller);
+  base::i18n::SetRTLForTesting(true);
+
+  SetPlacementAndLayout(2);  // left
+  CollapseAndWait(controller, true);
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+  CollapseAndWait(controller, false);
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+
+  SetPlacementAndLayout(3);  // right
+  CollapseAndWait(controller, true);
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+  CollapseAndWait(controller, false);
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+
+  base::i18n::SetRTLForTesting(false);
+}
+
+// roam-206: a dock-side flip made while an enable-state lock is held must
+// re-derive the icon on outermost unlock (OnLockDestroyed path).
+IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripPlacementTest,
+                       LockedDockSwitchRefreshesIconOnUnlock) {
+  auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_NE(nullptr, controller);
+  SetPlacementAndLayout(2);
+  CollapseAndWait(controller, false);
+  ASSERT_EQ(IconModel(views::kMenuOpenIcon), CollapseActionImage(browser()));
+
+  {
+    auto lock = controller->GetEnableStateLock();
+    SetPlacementAndLayout(3);  // flip while locked; icon deferred
+  }
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), CollapseActionImage(browser()));
+}
+
+// roam-206: with kTabStripPosition OFF the stock expression must be
+// preserved exactly — both directions. Upstream vertical tabs are enabled
+// explicitly so the collapse action exists deterministically.
+class RoamuxVerticalStripFlagOffIconTest
+    : public roamux::test::RoamuxBrowserTest {
+ public:
+  RoamuxVerticalStripFlagOffIconTest() {
+    features_.InitWithFeatures({::tabs::kVerticalTabs},
+                               {features::kTabStripPosition});
+  }
+
+ protected:
+  base::test::ScopedFeatureList features_;
+};
+
+IN_PROC_BROWSER_TEST_F(RoamuxVerticalStripFlagOffIconTest,
+                       StockIconExpressionPreserved) {
+  auto* controller = ::tabs::VerticalTabStripStateController::From(browser());
+  ASSERT_NE(nullptr, controller);
+  actions::ActionItem* item = actions::ActionManager::Get().FindAction(
+      kActionToggleCollapseVertical,
+      browser()->browser_actions()->root_action_item());
+  ASSERT_NE(nullptr, item);
+
+  // Activate upstream vertical tabs so the delegate exists and collapse
+  // round-trips (the roamux placement path is off in this fixture).
+  controller->SetVerticalTabsEnabled(true);
+  base::RunLoop().RunUntilIdle();
+
+  CollapseAndWait(controller, true);  // LTR collapsed → close (stock)
+  EXPECT_EQ(IconModel(views::kMenuCloseIcon), item->GetImage());
+
+  base::i18n::SetRTLForTesting(true);
+  CollapseAndWait(controller, false);
+  CollapseAndWait(controller, true);  // re-derive under RTL → open (stock)
+  EXPECT_EQ(IconModel(views::kMenuOpenIcon), item->GetImage());
+  base::i18n::SetRTLForTesting(false);
 }
 
 }  // namespace

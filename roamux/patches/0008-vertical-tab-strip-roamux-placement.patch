@@ -36,7 +36,7 @@ index 6aaf694106..34157ef829 100644
  
        std::optional<bool> restored_state_collapsed =
 diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
-index 9919d3a042..b206814076 100644
+index 9919d3a042..b74a020df4 100644
 --- a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
 +++ b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.cc
 @@ -6,6 +6,7 @@
@@ -105,7 +105,7 @@ index 9919d3a042..b206814076 100644
    NotifyModeWillChange();
    pref_service_->SetBoolean(prefs::kVerticalTabsEnabled, enabled);
  }
-@@ -298,9 +332,29 @@ void VerticalTabStripStateController::OnModeChanged() {
+@@ -298,9 +332,34 @@ void VerticalTabStripStateController::OnModeChanged() {
    is_vertical_tabs_enabled_ =
        pref_service_->GetBoolean(prefs::kVerticalTabsEnabled);
  
@@ -124,6 +124,11 @@ index 9919d3a042..b206814076 100644
 +  }
 +  roamux_placement_wants_vertical_ =
 +      roamux::ShouldDisplayVerticalTabsForPlacement(pref_service_);
++  // Roamux (roam-206): a same-mode left<->right flip changes which arrow is
++  // correct; re-derive the action item before the no-swap early return.
++  if (base::FeatureList::IsEnabled(roamux::features::kTabStripPosition)) {
++    UpdateCollapseActionItem();
++  }
 +  if (ShouldDisplayVerticalTabs() == roamux_last_display_vertical_) {
 +    // Same display mode (e.g. top<->bottom or left<->right): no strip swap;
 +    // layout updates ride the BrowserView-level placement observer.
@@ -135,7 +140,7 @@ index 9919d3a042..b206814076 100644
  void VerticalTabStripStateController::OnExpandOnHoverEnabledChanged() {
    is_expand_on_hover_enabled_ =
        pref_service_->GetBoolean(prefs::kVerticalTabsExpandOnHoverEnabled);
-@@ -336,9 +390,17 @@ void VerticalTabStripStateController::OnLockDestroyed() {
+@@ -336,9 +395,22 @@ void VerticalTabStripStateController::OnLockDestroyed() {
    enable_state_lock_count_--;
  
    if (enable_state_lock_count_ == 0) {
@@ -150,12 +155,34 @@ index 9919d3a042..b206814076 100644
 +        pref_service_->GetBoolean(prefs::kVerticalTabsEnabled);
 +    roamux_placement_wants_vertical_ =
 +        roamux::ShouldDisplayVerticalTabsForPlacement(pref_service_);
++    // Roamux (roam-206): the dock side may have flipped while locked; the
++    // same-mode case below never notifies, so re-derive the action item here.
++    if (base::FeatureList::IsEnabled(roamux::features::kTabStripPosition)) {
++      UpdateCollapseActionItem();
++    }
 +    const bool new_display = ShouldDisplayVerticalTabs();
 +    if (new_display != roamux_last_display_vertical_) {
 +      roamux_last_display_vertical_ = new_display;
        NotifyModeChanged();
      }
    }
+@@ -367,7 +439,15 @@ void VerticalTabStripStateController::UpdateCollapseActionItem() {
+   const bool is_collapsed =
+       GetCollapseState() != VerticalTabStripCollapseState::kExpanded;
+ 
+-  const gfx::VectorIcon& icon = (is_collapsed == base::i18n::IsRTL())
++  // Roamux (roam-206): the arrow points toward where the panel will move — a
++  // physical, RTL-invariant rule: open-icon iff collapsed == docked-right.
++  // Upstream's leading-edge dock is physically right exactly in RTL, so the
++  // flag-off branch reduces to the stock expression.
++  const bool physical_right =
++      base::FeatureList::IsEnabled(roamux::features::kTabStripPosition)
++          ? roamux::ShouldDockVerticalTabStripRight(pref_service_)
++          : base::i18n::IsRTL();
++  const gfx::VectorIcon& icon = (is_collapsed == physical_right)
+                                     ? views::kMenuOpenIcon
+                                     : views::kMenuCloseIcon;
+ 
 diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h
 index ae53c9d95a..07bcd66587 100644
 --- a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h
