@@ -48,6 +48,25 @@ class EdgeProfileReaderTest : public testing::Test {
     ASSERT_TRUE(s.Run());
   }
 
+  // Appends a row to the urls table WriteHistory() created, binding
+  // last_visit_time as a raw integer so a fixture can reproduce exactly what
+  // Edge stores for a url with no recorded visit (roam-203: the literal 0).
+  void AppendHistoryRow(const std::string& url,
+                        int64_t raw_last_visit_time,
+                        int visit_count) {
+    sql::Database db(kFixtureTag);
+    ASSERT_TRUE(db.Open(dir().Append(FILE_PATH_LITERAL("History"))));
+    sql::Statement s(db.GetUniqueStatement(
+        "INSERT INTO urls(url, title, visit_count, typed_count, "
+        "last_visit_time, hidden) VALUES(?,?,?,?,?,0)"));
+    s.BindString(0, url);
+    s.BindString16(1, u"Never visited");
+    s.BindInt(2, visit_count);
+    s.BindInt(3, 0);
+    s.BindInt64(4, raw_last_visit_time);
+    ASSERT_TRUE(s.Run());
+  }
+
   void WriteWebData(base::Time autofill_first, base::Time autofill_last) {
     sql::Database db(kFixtureTag);
     ASSERT_TRUE(db.Open(dir().Append(FILE_PATH_LITERAL("Web Data"))));
@@ -85,6 +104,32 @@ class EdgeProfileReaderTest : public testing::Test {
 
   base::ScopedTempDir profile_;
 };
+
+// roam-203: Edge stores last_visit_time = 0 for urls rows with no recorded
+// visit. HistoryBackend::AddPagesWithDetails DCHECKs !last_visit.is_null() on
+// every row it is handed, so such a row aborts the browser right after an
+// otherwise successful import. The reader must not emit them.
+TEST_F(EdgeProfileReaderTest, HistorySkipsRowsWithoutALastVisit) {
+  const base::Time visit = base::Time::FromTimeT(1700000000);
+  WriteHistory(visit);
+  AppendHistoryRow("https://never-visited.example.test/x",
+                   /*raw_last_visit_time=*/0, /*visit_count=*/0);
+  // FromChromeTime() nulls EVERY non-positive value, not just zero, so a
+  // negative timestamp must be dropped too. Without this row a fix that
+  // filtered the raw column against 0 would pass while still handing
+  // AddPagesWithDetails a null-time row.
+  AppendHistoryRow("https://negative-time.example.test/y",
+                   /*raw_last_visit_time=*/-1, /*visit_count=*/0);
+
+  auto rows = EdgeProfileReader(dir()).ReadHistory();
+
+  // Both visit-less rows are dropped; the real one survives untouched.
+  ASSERT_EQ(1u, rows.size());
+  EXPECT_EQ("https://portal.example.test/dash", rows[0].url.spec());
+  EXPECT_EQ(visit, rows[0].last_visit);
+  // The invariant AddPagesWithDetails requires of every row we hand it.
+  EXPECT_FALSE(rows[0].last_visit.is_null());
+}
 
 TEST_F(EdgeProfileReaderTest, HistoryFullFidelity) {
   const base::Time visit = base::Time::FromTimeT(1700000000);
