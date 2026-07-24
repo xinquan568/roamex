@@ -15,11 +15,15 @@ constexpr int kIdcReloadInitialUrl = 34059;
 // Keep in sync with chrome/app/chrome_command_ids.h (roam-25 patch 0017).
 constexpr int kIdcTabVisitBack = 33010;
 constexpr int kIdcTabVisitForward = 33011;
+// Keep in sync with chrome/app/chrome_command_ids.h (roam-214 patch 0053).
+constexpr int kIdcToggleTabStrip = 33012;
 // kVK_ANSI_R.
 constexpr int kVkAnsiR = 0x0F;
 // kVK_ANSI_LeftBracket / kVK_ANSI_RightBracket.
 constexpr int kVkAnsiLeftBracket = 0x21;
 constexpr int kVkAnsiRightBracket = 0x1E;
+// kVK_ANSI_T.
+constexpr int kVkAnsiT = 0x11;
 
 constexpr RoamuxShortcut kShortcuts[] = {
     {kIdcReloadInitialUrl,
@@ -50,6 +54,16 @@ constexpr RoamuxShortcut kShortcuts[] = {
       .ctrl = true,
       .opt = false,
       .keycode = kVkAnsiRightBracket}},
+    // roam-214: pin/peek toggle for the vertical tab strip. Ctrl+Cmd+T.
+    {kIdcToggleTabStrip,
+     "toggle_tab_strip",
+     "Toggle tab strip",
+     &features::kTabStripToggleShortcut,
+     {.cmd = true,
+      .shift = false,
+      .ctrl = true,
+      .opt = false,
+      .keycode = kVkAnsiT}},
 };
 
 }  // namespace

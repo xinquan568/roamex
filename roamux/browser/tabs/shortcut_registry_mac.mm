@@ -9,8 +9,11 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/cocoa/accelerators_cocoa.h"
+#include "roamux/browser/ui/views/tabs/tab_strip_toggle_command.h"
 #include "ui/base/accelerators/accelerator.h"
+#include "ui/base/base_window.h"
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/events/keycodes/dom/keycode_converter.h"
 #include "ui/events/keycodes/keyboard_code_conversion_mac.h"
@@ -18,6 +21,10 @@
 namespace roamux::tabs {
 
 namespace {
+
+// Keep in sync with chrome/app/chrome_command_ids.h (roam-214 patch 0053)
+// and shortcut_registry.cc.
+constexpr int kIdcToggleTabStrip = 33012;
 
 Chord ChordFromEvent(NSEvent* event) {
   const NSUInteger modifiers = [event modifierFlags];
@@ -56,13 +63,58 @@ void CollectMenuKeyEquivalents(NSMenu* menu, std::vector<Chord>* out) {
 
 }  // namespace
 
+namespace {
+
+// roam-214 (plan R1): the browser owning the EVENT's window — it can differ
+// from the last-active browser across profiles or redispatch.
+BrowserWindowInterface* BrowserForEventWindow(NSEvent* event) {
+  NSWindow* event_window = [event window];
+  if (!event_window) {
+    return nullptr;
+  }
+  for (BrowserWindowInterface* candidate : GetAllBrowserWindowInterfaces()) {
+    if (candidate->GetWindow() &&
+        candidate->GetWindow()->GetNativeWindow().GetNativeNSWindow() ==
+            event_window) {
+      return candidate;
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 int CommandForKeyEventOverride(NSEvent* event) {
-  BrowserWindowInterface* browser = chrome::FindLastActive();
-  if (!browser) {
+  const Chord chord = ChordFromEvent(event);
+  BrowserWindowInterface* last_active = chrome::FindLastActive();
+
+  // roam-214 (plan R1), scoped to the toggle command ONLY — existing
+  // shortcuts keep their historical last-active resolution below. BOTH the
+  // chord binding (the rebind dict is a profile pref) AND availability are
+  // resolved against the browser owning the event's window, so a window can
+  // neither miss its own profile's binding nor accept another profile's.
+  // Unmappable window -> the toggle never claims the event.
+  if (BrowserWindowInterface* target = BrowserForEventWindow(event)) {
+    const int target_id = CommandForChord(target->GetProfile()->GetPrefs(),
+                                          AllShortcuts(), chord);
+    if (target_id == kIdcToggleTabStrip) {
+      return tabs_toggle::CanToggleTabStrip(target) ? target_id : -1;
+    }
+  }
+
+  if (!last_active) {
     return -1;
   }
-  return CommandForChord(browser->GetProfile()->GetPrefs(), AllShortcuts(),
-                         ChordFromEvent(event));
+  const int command_id = CommandForChord(last_active->GetProfile()->GetPrefs(),
+                                         AllShortcuts(), chord);
+  if (command_id == kIdcToggleTabStrip) {
+    // The last-active profile binds this chord to the toggle, but the
+    // event's window did not resolve it (different profile/binding or
+    // unmappable): never execute the toggle against a window that did not
+    // bind it.
+    return -1;
+  }
+  return command_id;
 }
 
 std::vector<Chord> EnumerateReservedChords(int exclude_command_id) {

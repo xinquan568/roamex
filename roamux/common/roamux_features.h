@@ -24,6 +24,9 @@ BASE_DECLARE_FEATURE(
 BASE_DECLARE_FEATURE(
     kRoamuxExternalOpenProfile); // roam-213 — designated profile for external
                                  // opens (Finder files / links from other apps)
+BASE_DECLARE_FEATURE(
+    kTabStripToggleShortcut); // roam-214 — pin/peek + collapse/expand shortcut
+                              // for the vertical tab strip
 
 } // namespace roamux::features
 

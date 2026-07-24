@@ -125,14 +125,16 @@ TEST_F(ShortcutRegistryTest, DispatchHonorsOverride) {
 TEST_F(ShortcutRegistryTest, ProductionTableShape) {
   // The tripwire: every production-table change must update this consciously.
   // Row 0 = roam-12 reload-initial-url; rows 1-2 = roam-25 tab-visit
-  // traversal (Ctrl+Cmd+[ / Ctrl+Cmd+], Carbon keycodes 0x21 / 0x1E).
+  // traversal (Ctrl+Cmd+[ / Ctrl+Cmd+], Carbon keycodes 0x21 / 0x1E);
+  // row 3 = roam-214 tab-strip pin/peek toggle (Ctrl+Cmd+T, 0x11).
   constexpr Chord kCtrlCmdLeftBracket{
       .cmd = true, .ctrl = true, .keycode = 0x21};
   constexpr Chord kCtrlCmdRightBracket{
       .cmd = true, .ctrl = true, .keycode = 0x1E};
+  // kCtrlCmdT is the file-scope constant (0x11) — also the roam-214 default.
 
   auto table = AllShortcuts();
-  ASSERT_EQ(3u, table.size());
+  ASSERT_EQ(4u, table.size());
 
   EXPECT_EQ(34059, table[0].command_id);
   EXPECT_STREQ("reload_initial_url", table[0].pref_key);
@@ -148,6 +150,11 @@ TEST_F(ShortcutRegistryTest, ProductionTableShape) {
   EXPECT_STREQ("tab_visit_forward", table[2].pref_key);
   EXPECT_EQ(&features::kTabVisitNav, table[2].feature);
   EXPECT_EQ(kCtrlCmdRightBracket, table[2].default_chord);
+
+  EXPECT_EQ(33012, table[3].command_id);
+  EXPECT_STREQ("toggle_tab_strip", table[3].pref_key);
+  EXPECT_EQ(&features::kTabStripToggleShortcut, table[3].feature);
+  EXPECT_EQ(kCtrlCmdT, table[3].default_chord);
 }
 
 }  // namespace

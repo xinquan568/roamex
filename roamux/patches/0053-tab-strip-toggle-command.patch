@@ -1,0 +1,68 @@
+diff --git a/chrome/app/chrome_command_ids.h b/chrome/app/chrome_command_ids.h
+index 8f3a837dca..4cc80a9870 100644
+--- a/chrome/app/chrome_command_ids.h
++++ b/chrome/app/chrome_command_ids.h
+@@ -35,6 +35,9 @@
+ // roamux/browser/tabs/shortcut_registry.cc).
+ #define IDC_TAB_VISIT_BACK              33010
+ #define IDC_TAB_VISIT_FORWARD           33011
++// Roamux (roam-214): vertical-tab-strip pin/peek toggle (kept in sync with
++// roamux/browser/tabs/shortcut_registry.cc).
++#define IDC_ROAMUX_TOGGLE_TAB_STRIP     33012
+ 
+ // Window management commands
+ #define IDC_NEW_WINDOW                  34000
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index 4d7a6b1091..62063e275a 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -5716,6 +5716,14 @@ static_library("ui") {
+     "//roamux/browser/tab_visit/tab_visit_command.h",
+   ]
+ 
++  # Roamux (roam-214): the tab-strip toggle command shim (always built; the
++  # per-window pin-controller glue installs the real handler — patch 0054).
++  sources += [
++    "//roamux/browser/ui/views/tabs/tab_strip_toggle_command.cc",
++    "//roamux/browser/ui/views/tabs/tab_strip_toggle_command.h",
++  ]
++
++
+   # Roamux (roam-140): settings_ui.{h,cc} include the generated
+   # roamux/app/app_buildflags.h UNCONDITIONALLY (to test
+   # BUILDFLAG(ROAMUX_ENABLE_SPARKLE)), so its generator is an unconditional dep
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+index e134b10a1d..c07e916bc1 100644
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -56,6 +56,7 @@
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "roamux/browser/tabs/reload_initial_url_command.h"
+ #include "roamux/browser/tab_visit/tab_visit_command.h"
++#include "roamux/browser/ui/views/tabs/tab_strip_toggle_command.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/browser_finder.h"
+ #include "chrome/browser/ui/browser_window.h"
+@@ -674,6 +675,9 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
+     case IDC_TAB_VISIT_FORWARD:
+       roamux::tab_visit::TabVisitForward(browser_);
+       break;
++    case IDC_ROAMUX_TOGGLE_TAB_STRIP:
++      roamux::tabs_toggle::ToggleTabStrip(browser_);
++      break;
+     case IDC_VERTICAL_TABS_SEND_FEEDBACK:
+       chrome::ShowFeedbackPage(browser_, feedback::kFeedbackSourceVerticalTabs,
+                                /*description_template=*/"",
+@@ -1620,6 +1624,12 @@ void BrowserCommandController::InitCommandState() {
+       IDC_TAB_VISIT_BACK, roamux::tab_visit::CanTabVisitBack(browser_));
+   command_updater_.UpdateCommandEnabled(
+       IDC_TAB_VISIT_FORWARD, roamux::tab_visit::CanTabVisitForward(browser_));
++  // Roamux (roam-214): dynamic — re-evaluated by the pin-controller glue on
++  // placement/setting changes; the mac registry filter also recomputes
++  // availability at every key event.
++  command_updater_.UpdateCommandEnabled(
++      IDC_ROAMUX_TOGGLE_TAB_STRIP,
++      roamux::tabs_toggle::CanToggleTabStrip(browser_));
+ #if BUILDFLAG(IS_CHROMEOS)
+   command_updater_.UpdateCommandEnabled(IDC_TOGGLE_MULTITASK_MENU, true);
+   command_updater_.UpdateCommandEnabled(IDC_MINIMIZE_WINDOW, true);

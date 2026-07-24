@@ -47,4 +47,11 @@ TEST(RoamuxFeaturesTest, EdgeImportEnabledByDefault) {
   EXPECT_TRUE(base::FeatureList::IsEnabled(roamux::features::kEdgeImport));
 }
 
+TEST(RoamuxFeaturesTest, TabStripToggleShortcutDisabledByDefault) {
+  // roam-214: ships OFF (kill-switch convention); flip-on is a
+  // post-verification follow-up.
+  EXPECT_FALSE(
+      base::FeatureList::IsEnabled(roamux::features::kTabStripToggleShortcut));
+}
+
 }  // namespace

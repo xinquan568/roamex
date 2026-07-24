@@ -1,0 +1,47 @@
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+index ec88980bd8..5842caa76f 100644
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -4789,6 +4789,14 @@ const FeatureEntry kFeatureEntries[] = {
+     {"roamux-edge-import", "Roamux: import from Microsoft Edge",
+      "Adds Microsoft Edge as a source in the import-data dialog on macOS.",
+      kOsMac, FEATURE_VALUE_TYPE(roamux::features::kEdgeImport)},
++    // Roamux (roam-214): vertical-tab-strip pin/peek toggle shortcut.
++    {"roamux-tab-strip-toggle-shortcut",
++     "Roamux: tab strip toggle shortcut",
++     "Adds a rebindable keyboard shortcut (default Ctrl+Cmd+T) that pins the "
++     "auto-hide vertical tab strip open (\"peek\") and toggles collapse when "
++     "auto-hide is off. Disabled for top/bottom tab strip placement.",
++     kOsMac,
++     FEATURE_VALUE_TYPE(roamux::features::kTabStripToggleShortcut)},
+     // Roamux (roam-213): designated profile for external opens.
+     {"roamux-external-open-profile",
+      "Roamux: default profile for external links and files",
+diff --git a/chrome/browser/flag-metadata.json b/chrome/browser/flag-metadata.json
+index a273bbe5fa..8774d24e22 100644
+--- a/chrome/browser/flag-metadata.json
++++ b/chrome/browser/flag-metadata.json
+@@ -8425,6 +8425,11 @@
+     "owners": [ "xinquan568@users.noreply.github.com" ],
+     "expiry_milestone": -1
+   },
++  {
++    "name": "roamux-tab-strip-toggle-shortcut",
++    "owners": [ "xinquan568@users.noreply.github.com" ],
++    "expiry_milestone": -1
++  },
+   {
+     "name": "roamux-tab-visit-nav",
+     "owners": [ "xinquan568@users.noreply.github.com" ],
+diff --git a/chrome/browser/flag-never-expire-list.json b/chrome/browser/flag-never-expire-list.json
+index 6c7778dac4..01506f8669 100644
+--- a/chrome/browser/flag-never-expire-list.json
++++ b/chrome/browser/flag-never-expire-list.json
+@@ -121,6 +121,7 @@
+   "roamux-initial-url",
+   "roamux-signin-opt-in",
+   "roamux-tab-strip-position",
++  "roamux-tab-strip-toggle-shortcut",
+   "roamux-tab-visit-nav",
+   "scheduler-configuration",
+   "set-market-url-for-testing",

@@ -26,5 +26,9 @@ BASE_FEATURE(kRoamuxSchemeAlias, "RoamuxSchemeAlias",
 BASE_FEATURE(kRoamuxExternalOpenProfile,
              "RoamuxExternalOpenProfile",
              base::FEATURE_DISABLED_BY_DEFAULT);
+// roam-214: ships default-OFF; flip-on is a post-verification follow-up.
+BASE_FEATURE(kTabStripToggleShortcut,
+             "RoamuxTabStripToggleShortcut",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 } // namespace roamux::features

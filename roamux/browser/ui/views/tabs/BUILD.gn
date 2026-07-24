@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Additive //roamux/browser/ui/views/tabs — the roam-214 pin/peek state
+# machine core. Pure logic: deps stay //base-only so the fast unit target
+# links it without the browser layer (plan R3); the views glue that
+# implements Delegate compiles into the upstream UI target via patch 0054.
+
+source_set("pin_core") {
+  sources = [
+    "tab_strip_pin_controller.cc",
+    "tab_strip_pin_controller.h",
+  ]
+  deps = [ "//base" ]
+}
