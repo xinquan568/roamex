@@ -37,6 +37,8 @@
 #include "roamux/browser/bookmarks/subfolder_tab_groups.h"
 #include "roamux/common/roamux_features.h"
 #include "roamux/test/support/roamux_browser_test.h"
+#include "chrome/grit/generated_resources.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/menus/simple_menu_model.h"
 #include "url/gurl.h"
 
@@ -48,9 +50,11 @@ using bookmarks::BookmarkNode;
 
 size_t g_prompt_count = 0;
 bool g_prompt_answer = true;
+std::u16string g_prompt_message;
 
-bool CountingPrompt(size_t total_urls) {
+bool CountingPrompt(size_t total_urls, const std::u16string& message) {
   ++g_prompt_count;
+  g_prompt_message = message;
   return g_prompt_answer;
 }
 
@@ -67,6 +71,7 @@ class RoamuxBookmarkSubfolderGroupsTest
     bookmarks::test::WaitForBookmarkModelToLoad(model_);
     g_prompt_count = 0;
     g_prompt_answer = true;
+    g_prompt_message.clear();
     previous_prompt_ = SetBulkOpenPromptCallbackForTesting(&CountingPrompt);
   }
 
@@ -236,6 +241,20 @@ IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsTest,
   }
   auto menu = MenuFor(big);
   ASSERT_TRUE(HasSubfolderItem(*menu));
+
+  // Declined: no window opens, exactly one prompt with the production text.
+  g_prompt_answer = false;
+  const size_t browsers_before = chrome::GetTotalBrowserCount();
+  menu->ExecuteCommand(IDC_ROAMUX_BOOKMARK_BAR_OPEN_SUBFOLDERS_AS_TAB_GROUPS,
+                       0);
+  EXPECT_EQ(1u, g_prompt_count);
+  EXPECT_EQ(l10n_util::GetStringFUTF16(IDS_BOOKMARK_BAR_SHOULD_OPEN_ALL, u"15"),
+            g_prompt_message);
+  EXPECT_EQ(browsers_before, chrome::GetTotalBrowserCount());
+
+  // Accepted: one more prompt, and the window opens.
+  g_prompt_answer = true;
+  g_prompt_count = 0;
   Browser* opened = ExecuteAndWaitForBrowser(*menu);
   ASSERT_NE(nullptr, opened);
   EXPECT_EQ(1u, g_prompt_count);

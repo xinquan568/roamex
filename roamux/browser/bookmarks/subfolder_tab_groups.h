@@ -45,8 +45,10 @@ void OpenSubfolderGroupsInNewWindow(Browser* source,
                                     std::vector<SubfolderGroupPlan> plans);
 
 // Test seam for the aggregate prompt: when set, replaces the dialog and
-// returns the canned answer. Returns the previous callback.
-using BulkOpenPromptCallback = bool (*)(size_t total_urls);
+// returns the canned answer. `message` is the exact dialog text production
+// would show. Returns the previous callback.
+using BulkOpenPromptCallback = bool (*)(size_t total_urls,
+                                        const std::u16string& message);
 BulkOpenPromptCallback SetBulkOpenPromptCallbackForTesting(
     BulkOpenPromptCallback callback);
 

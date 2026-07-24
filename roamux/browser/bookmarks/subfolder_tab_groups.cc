@@ -126,17 +126,17 @@ void OpenSubfolderGroupsInNewWindow(Browser* source,
   // same asynchronous dialog shape and strings the bookmark open-all path
   // uses. The plans are snapshots, so the continuation cannot dangle.
   if (total >= bookmarks::kNumBookmarkUrlsBeforePrompting) {
+    const std::u16string message = l10n_util::GetStringFUTF16(
+        IDS_BOOKMARK_BAR_SHOULD_OPEN_ALL, base::NumberToString16(total));
     if (g_bulk_prompt_for_testing) {
-      if (g_bulk_prompt_for_testing(total)) {
+      if (g_bulk_prompt_for_testing(total, message)) {
         DoOpenSubfolderGroups(source->profile(), std::move(plans));
       }
       return;
     }
     chrome::ShowQuestionMessageBoxAsync(
         source->window()->GetNativeWindow(),
-        l10n_util::GetStringUTF16(IDS_PRODUCT_NAME),
-        l10n_util::GetStringFUTF16(IDS_BOOKMARK_BAR_SHOULD_OPEN_ALL,
-                                   base::NumberToString16(total)),
+        l10n_util::GetStringUTF16(IDS_PRODUCT_NAME), message,
         base::BindOnce(&OnBulkOpenPromptAnswered, source->profile(),
                        std::move(plans)));
     return;
