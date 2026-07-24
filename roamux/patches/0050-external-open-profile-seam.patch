@@ -11,17 +11,17 @@ index 9c18c048fd..8755fb75b9 100644
      "//roamux/common",
      ":active_use_util",
 diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
-index 51cf1f9e2b..3f337c36d4 100644
+index 51cf1f9e2b..c4f0f9311b 100644
 --- a/chrome/browser/app_controller_mac.mm
 +++ b/chrome/browser/app_controller_mac.mm
-@@ -136,6 +136,7 @@
- #include "extensions/browser/extension_system.h"
+@@ -137,6 +137,7 @@
  #include "extensions/buildflags/buildflags.h"
  #include "net/base/apple/url_conversions.h"
-+#include "roamux/browser/profiles/external_open_profile.h"
  #include "net/base/filename_util.h"
++#include "roamux/browser/profiles/external_open_profile.h"
  #import "ui/base/cocoa/nsmenu_additions.h"
  #import "ui/base/cocoa/nsmenuitem_additions.h"
+ #include "ui/base/l10n/l10n_util.h"
 @@ -514,9 +515,32 @@ void OpenUrlsInBrowser(std::vector<GURL> urls) {
    }
  

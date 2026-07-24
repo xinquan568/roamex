@@ -43,7 +43,7 @@ index b1caa27505..3d37a18fde 100644
 +</template>
  </settings-subpage>
 diff --git a/chrome/browser/resources/settings/people_page/manage_profile.ts b/chrome/browser/resources/settings/people_page/manage_profile.ts
-index 921e4fb41a..e1f75cb11b 100644
+index 921e4fb41a..a9380ccf9a 100644
 --- a/chrome/browser/resources/settings/people_page/manage_profile.ts
 +++ b/chrome/browser/resources/settings/people_page/manage_profile.ts
 @@ -17,6 +17,7 @@ import 'chrome://resources/cr_elements/cr_tooltip/cr_tooltip.js';
@@ -89,7 +89,7 @@ index 921e4fb41a..e1f75cb11b 100644
    declare private pattern_: string;
    private browserProxy_: ManageProfileBrowserProxy =
        ManageProfileBrowserProxyImpl.getInstance();
-@@ -137,6 +148,26 @@ export class SettingsManageProfileElement extends
+@@ -137,6 +148,28 @@ export class SettingsManageProfileElement extends
          'profile-info-changed', this.onProfileInfoChanged_.bind(this));
    }
  
@@ -103,10 +103,12 @@ index 921e4fb41a..e1f75cb11b 100644
 +
 +  private onExternalOpenToggleChange_(e: CustomEvent<boolean>) {
 +    if (e.detail) {
-+      this.setPrefValue('roamux.profiles.external_open_mode', 1);
++      // Target FIRST, mode=1 LAST — the designation only becomes active once
++      // the target value is valid (no transient stale-target activation).
 +      this.setPrefValue(
 +          'roamux.profiles.external_open_profile',
 +          loadTimeData.getString('roamuxProfileDirBaseName'));
++      this.setPrefValue('roamux.profiles.external_open_mode', 1);
 +    } else {
 +      // Unchecking clears the mode only; the stored name is inert at mode 0.
 +      this.setPrefValue('roamux.profiles.external_open_mode', 0);
