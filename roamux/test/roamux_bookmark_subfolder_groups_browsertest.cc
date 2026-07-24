@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "base/no_destructor.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/app/chrome_command_ids.h"
@@ -50,11 +51,15 @@ using bookmarks::BookmarkNode;
 
 size_t g_prompt_count = 0;
 bool g_prompt_answer = true;
-std::u16string g_prompt_message;
+
+std::u16string& PromptMessageForTesting() {
+  static base::NoDestructor<std::u16string> message;
+  return *message;
+}
 
 bool CountingPrompt(size_t total_urls, const std::u16string& message) {
   ++g_prompt_count;
-  g_prompt_message = message;
+  PromptMessageForTesting() = message;
   return g_prompt_answer;
 }
 
@@ -71,7 +76,7 @@ class RoamuxBookmarkSubfolderGroupsTest
     bookmarks::test::WaitForBookmarkModelToLoad(model_);
     g_prompt_count = 0;
     g_prompt_answer = true;
-    g_prompt_message.clear();
+    PromptMessageForTesting().clear();
     previous_prompt_ = SetBulkOpenPromptCallbackForTesting(&CountingPrompt);
   }
 
@@ -249,7 +254,7 @@ IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsTest,
                        0);
   EXPECT_EQ(1u, g_prompt_count);
   EXPECT_EQ(l10n_util::GetStringFUTF16(IDS_BOOKMARK_BAR_SHOULD_OPEN_ALL, u"15"),
-            g_prompt_message);
+            PromptMessageForTesting());
   EXPECT_EQ(browsers_before, chrome::GetTotalBrowserCount());
 
   // Accepted: one more prompt, and the window opens.
