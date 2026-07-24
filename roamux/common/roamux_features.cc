@@ -9,6 +9,7 @@ BASE_FEATURE(kInitialUrl, "RoamuxInitialUrl",
              base::FEATURE_ENABLED_BY_DEFAULT);  // roam-187: shipped default-on
 BASE_FEATURE(kEdgeImport, "RoamuxEdgeImport",
              base::FEATURE_ENABLED_BY_DEFAULT);  // roam-190: shipped default-on
+// roam-208: ships default-OFF; flip-on is a post-verification follow-up.
 BASE_FEATURE(kBookmarkSubfolderGroups,
              "RoamuxBookmarkSubfolderGroups",
              base::FEATURE_DISABLED_BY_DEFAULT);

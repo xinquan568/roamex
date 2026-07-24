@@ -15,6 +15,10 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/bookmarks/bookmark_context_menu_controller.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/ui_features.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
+#include "components/saved_tab_groups/public/saved_tab_group.h"
+#include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -28,6 +32,7 @@
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/tab_group.h"
+#include "ui/gfx/range/range.h"
 #include "content/public/test/browser_test.h"
 #include "roamux/browser/bookmarks/subfolder_tab_groups.h"
 #include "roamux/common/roamux_features.h"
@@ -175,14 +180,19 @@ IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsTest,
   }
   EXPECT_EQ((std::vector<std::u16string>{u"AI", u"Mails"}), titles);
 
-  std::set<std::string> urls;
+  const std::vector<std::string> expected_urls = {
+      "https://a1.test/", "https://a2.test/", "https://m1.test/"};
+  std::vector<std::string> actual_urls;
   for (int i = 0; i < tabs->count(); ++i) {
-    urls.insert(tabs->GetWebContentsAt(i)->GetVisibleURL().spec());
+    actual_urls.push_back(tabs->GetWebContentsAt(i)->GetVisibleURL().spec());
+    EXPECT_TRUE(tabs->GetTabGroupForTab(i).has_value()) << i;
   }
-  EXPECT_EQ(1u, urls.count("https://a1.test/"));
-  EXPECT_EQ(1u, urls.count("https://a2.test/"));
-  EXPECT_EQ(1u, urls.count("https://m1.test/"));
-  EXPECT_EQ(0u, urls.count("https://direct.test/"));
+  EXPECT_EQ(expected_urls, actual_urls);
+  const auto group_ids = groups->ListTabGroups();
+  EXPECT_EQ(gfx::Range(0, 2),
+            groups->GetTabGroup(group_ids[0])->ListTabs());  // AI: a1, a2
+  EXPECT_EQ(gfx::Range(2, 3),
+            groups->GetTabGroup(group_ids[1])->ListTabs());  // Mails: m1
 }
 
 // B3 (decision 6): distinct colors for <=9 groups in the fresh window.
@@ -238,16 +248,49 @@ IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsTest,
   EXPECT_EQ(0u, g_prompt_count);
 }
 
-// B7 (decision 8): fresh groups always; the saved-tab-group conversion
-// dialog can never appear because group creation never routes through the
-// bookmark-connected open-in-group flow. Structural assertion: executing on
-// a folder yields exactly plan-shaped fresh groups (titles above) and no
-// modal is required to proceed (the command completes without interaction —
-// the prompt seam is the only dialog surface and stays at zero below
-// threshold).
-IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsTest,
+// B7 (decision 8): with the conversion feature ENABLED and the clicked
+// folder GENUINELY connected to a saved tab group, execution still creates
+// fresh groups, completes without any dialog (no interaction needed; the
+// prompt seam stays at zero), and leaves the saved group untouched.
+class RoamuxBookmarkSubfolderGroupsConversionTest
+    : public RoamuxBookmarkSubfolderGroupsTest {
+ public:
+  RoamuxBookmarkSubfolderGroupsConversionTest() {
+    conversion_features_.InitAndEnableFeature(
+        ::features::kBookmarkTabGroupConversion);
+  }
+
+ private:
+  base::test::ScopedFeatureList conversion_features_;
+};
+
+IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsConversionTest,
                        FreshGroupsNoConversionDialog) {
   const BookmarkNode* parent = BuildIssueTree();
+
+  // Connect `parent` the way the conversion flow's lookup expects
+  // (SavedTabGroup.bookmark_node_id == folder uuid).
+  tab_groups::TabGroupSyncService* sync_service =
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+          browser()->profile());
+  ASSERT_NE(nullptr, sync_service);
+  tab_groups::SavedTabGroup saved(u"Connected",
+                                  tab_groups::TabGroupColorId::kGrey, {},
+                                  std::nullopt);
+  saved.SetBookmarkNodeId(parent->uuid());
+  const base::Uuid saved_guid = saved.saved_guid();
+  saved.AddTabLocally(tab_groups::SavedTabGroupTab(
+      GURL("https://kept.test/"), u"kept", saved_guid, /*position=*/0));
+  sync_service->AddGroup(std::move(saved));
+  // Sanity: the connection is registered exactly as the conversion flow's
+  // lookup sees it.
+  bool connected = false;
+  for (const auto& g : sync_service->GetAllGroups()) {
+    connected |= g.saved_guid() == saved_guid &&
+                 g.bookmark_node_id() == parent->uuid();
+  }
+  ASSERT_TRUE(connected);
+
   auto menu = MenuFor(parent);
   ASSERT_TRUE(HasSubfolderItem(*menu));
   Browser* opened = ExecuteAndWaitForBrowser(*menu);
@@ -255,6 +298,46 @@ IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsTest,
   EXPECT_EQ(0u, g_prompt_count);
   EXPECT_EQ(2u,
             opened->tab_strip_model()->group_model()->ListTabGroups().size());
+
+  // The connected saved group is untouched — fresh groups, no conversion.
+  bool saved_untouched = false;
+  for (const auto& g : sync_service->GetAllGroups()) {
+    if (g.saved_guid() == saved_guid) {
+      saved_untouched = g.bookmark_node_id() == parent->uuid();
+    }
+  }
+  EXPECT_TRUE(saved_untouched);
+}
+
+// B8d (side-panel copy inputs): the selection shapes whose controller menus
+// lack the row — URL selection, multi-selection, N==0 — all construct
+// cleanly; the presence-checked side-panel copy is a no-op for each (its
+// crash mode was an unchecked value() on exactly these menus).
+IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsTest,
+                       RowAbsentForNonQualifyingSelections) {
+  const BookmarkNode* parent = BuildIssueTree();
+  const BookmarkNode* url_node = parent->children()[0].get();  // direct link
+  ASSERT_TRUE(url_node->is_url());
+  auto url_menu = MenuFor(url_node);
+  EXPECT_FALSE(HasSubfolderItem(*url_menu));
+
+  Browser* b = browser();
+  BookmarkContextMenuController multi(
+      gfx::NativeWindow(), /*delegate=*/nullptr, b, b->profile(),
+      BookmarkLaunchLocation::kAttachedBar,
+      std::vector<raw_ptr<const BookmarkNode, VectorExperimental>>{
+          parent->children()[1].get(), parent->children()[2].get()},
+      /*can_paste=*/false);
+  EXPECT_FALSE(multi.menu_model()
+                   ->GetIndexOfCommandId(
+                       IDC_ROAMUX_BOOKMARK_BAR_OPEN_SUBFOLDERS_AS_TAB_GROUPS)
+                   .has_value());
+
+  const BookmarkNode* zero =
+      model_->AddFolder(model_->bookmark_bar_node(), 0, u"Zed");
+  model_->AddURL(zero, 0, u"z", GURL("https://z.test/"));
+  auto zero_menu = MenuFor(zero);
+  EXPECT_FALSE(HasSubfolderItem(*zero_menu));
 }
 
 // B8a (confinement): the row is absent in an OTR browser.
@@ -307,6 +390,14 @@ IN_PROC_BROWSER_TEST_F(RoamuxBookmarkSubfolderGroupsFlagOffTest,
                    ->GetIndexOfCommandId(
                        IDC_ROAMUX_BOOKMARK_BAR_OPEN_SUBFOLDERS_AS_TAB_GROUPS)
                    .has_value());
+  // The rest of the folder menu stays stock.
+  EXPECT_TRUE(controller.menu_model()
+                  ->GetIndexOfCommandId(IDC_BOOKMARK_BAR_OPEN_ALL)
+                  .has_value());
+  EXPECT_TRUE(
+      controller.menu_model()
+          ->GetIndexOfCommandId(IDC_BOOKMARK_BAR_OPEN_ALL_NEW_TAB_GROUP)
+          .has_value());
 }
 
 }  // namespace

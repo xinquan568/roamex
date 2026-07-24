@@ -3,6 +3,8 @@
 
 #include <utility>
 
+#include "base/functional/bind.h"
+#include "base/strings/string_number_conversions.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils_desktop.h"
 #include "chrome/browser/ui/browser.h"
@@ -12,6 +14,7 @@
 #include "chrome/browser/ui/simple_message_box.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/bookmarks/browser/bookmark_node.h"
 #include "components/tab_groups/tab_group_visual_data.h"
@@ -57,40 +60,14 @@ std::vector<SubfolderGroupPlan> BuildSubfolderGroupPlans(
   return plans;
 }
 
-void OpenSubfolderGroupsInNewWindow(Browser* source,
-                                    std::vector<SubfolderGroupPlan> plans) {
-  if (!source || plans.empty()) {
-    return;
-  }
+namespace {
 
-  size_t total = 0;
-  for (const SubfolderGroupPlan& plan : plans) {
-    total += plan.urls.size();
-  }
-
-  // Decision 7: exactly one aggregate prompt at the shared threshold.
-  if (total >= bookmarks::kNumBookmarkUrlsBeforePrompting) {
-    bool proceed;
-    if (g_bulk_prompt_for_testing) {
-      proceed = g_bulk_prompt_for_testing(total);
-    } else {
-      proceed =
-          chrome::ShowQuestionMessageBoxSync(
-              source->window()->GetNativeWindow(), std::u16string(),
-              l10n_util::GetPluralStringFUTF16(IDS_BOOKMARK_BAR_SHOULD_OPEN_ALL,
-                                               static_cast<int>(total))) ==
-          chrome::MESSAGE_BOX_RESULT_YES;
-    }
-    if (!proceed) {
-      return;
-    }
-  }
-
-  // Decision 3: one new window in the invoking profile; groups in bookmark
-  // order. Decision 8: direct group creation — the bookmark-connected
-  // open-in-group flow (and its conversion dialog) is never involved.
-  Browser* opened =
-      Browser::Create(Browser::CreateParams(source->profile(), true));
+// Decision 3: one new window in the invoking profile; groups in bookmark
+// order. Decision 8: direct group creation — the bookmark-connected
+// open-in-group flow (and its conversion dialog) is never involved.
+void DoOpenSubfolderGroups(Profile* profile,
+                           std::vector<SubfolderGroupPlan> plans) {
+  Browser* opened = Browser::Create(Browser::CreateParams(profile, true));
   TabStripModel* tabs = opened->tab_strip_model();
   for (const SubfolderGroupPlan& plan : plans) {
     const int start = tabs->count();
@@ -122,6 +99,49 @@ void OpenSubfolderGroupsInNewWindow(Browser* source,
   }
   tabs->ActivateTabAt(0);
   opened->window()->Show();
+}
+
+void OnBulkOpenPromptAnswered(Profile* profile,
+                              std::vector<SubfolderGroupPlan> plans,
+                              chrome::MessageBoxResult result) {
+  if (result == chrome::MESSAGE_BOX_RESULT_YES) {
+    DoOpenSubfolderGroups(profile, std::move(plans));
+  }
+}
+
+}  // namespace
+
+void OpenSubfolderGroupsInNewWindow(Browser* source,
+                                    std::vector<SubfolderGroupPlan> plans) {
+  if (!source || plans.empty()) {
+    return;
+  }
+
+  size_t total = 0;
+  for (const SubfolderGroupPlan& plan : plans) {
+    total += plan.urls.size();
+  }
+
+  // Decision 7: exactly one aggregate prompt at the shared threshold — the
+  // same asynchronous dialog shape and strings the bookmark open-all path
+  // uses. The plans are snapshots, so the continuation cannot dangle.
+  if (total >= bookmarks::kNumBookmarkUrlsBeforePrompting) {
+    if (g_bulk_prompt_for_testing) {
+      if (g_bulk_prompt_for_testing(total)) {
+        DoOpenSubfolderGroups(source->profile(), std::move(plans));
+      }
+      return;
+    }
+    chrome::ShowQuestionMessageBoxAsync(
+        source->window()->GetNativeWindow(),
+        l10n_util::GetStringUTF16(IDS_PRODUCT_NAME),
+        l10n_util::GetStringFUTF16(IDS_BOOKMARK_BAR_SHOULD_OPEN_ALL,
+                                   base::NumberToString16(total)),
+        base::BindOnce(&OnBulkOpenPromptAnswered, source->profile(),
+                       std::move(plans)));
+    return;
+  }
+  DoOpenSubfolderGroups(source->profile(), std::move(plans));
 }
 
 BulkOpenPromptCallback SetBulkOpenPromptCallbackForTesting(

@@ -42,19 +42,22 @@ index 2f639ed..729cbee 100644
        &amp;Open in New Tab
      </message>
 diff --git a/chrome/browser/ui/bookmarks/bookmark_context_menu_controller.cc b/chrome/browser/ui/bookmarks/bookmark_context_menu_controller.cc
-index 56f0185..ebb59c3 100644
+index 56f0185..7001e19 100644
 --- a/chrome/browser/ui/bookmarks/bookmark_context_menu_controller.cc
 +++ b/chrome/browser/ui/bookmarks/bookmark_context_menu_controller.cc
-@@ -50,6 +50,8 @@
- #include "components/tab_groups/tab_group_visual_data.h"
- #include "components/undo/bookmark_undo_service.h"
- #include "content/public/browser/page_navigator.h"
+@@ -4,6 +4,11 @@
+ 
+ #include "chrome/browser/ui/bookmarks/bookmark_context_menu_controller.h"
+ 
++#include "chrome/browser/prefs/incognito_mode_prefs.h"
++#include "components/policy/core/common/policy_pref_names.h"
 +#include "roamux/browser/bookmarks/subfolder_tab_groups.h"
 +#include "roamux/common/roamux_features.h"
- #include "ui/base/l10n/l10n_util.h"
++
+ #include <stddef.h>
  
- using base::UserMetricsAction;
-@@ -252,6 +254,25 @@ void BookmarkContextMenuController::BuildMenu() {
+ #include <memory>
+@@ -252,6 +257,25 @@ void BookmarkContextMenuController::BuildMenu() {
      AddItem(IDC_BOOKMARK_BAR_OPEN_ALL_NEW_TAB_GROUP,
              l10n_util::GetPluralStringFUTF16(
                  IDS_BOOKMARK_BAR_OPEN_ALL_COUNT_NEW_TAB_GROUP, count));
@@ -80,7 +83,7 @@ index 56f0185..ebb59c3 100644
    }
  
    AddSeparator();
-@@ -323,6 +344,14 @@ void BookmarkContextMenuController::ExecuteCommand(int id, int event_flags) {
+@@ -323,6 +347,14 @@ void BookmarkContextMenuController::ExecuteCommand(int id, int event_flags) {
    base::WeakPtr<BookmarkContextMenuController> ref(weak_factory_.GetWeakPtr());
  
    switch (id) {
@@ -95,19 +98,8 @@ index 56f0185..ebb59c3 100644
      case IDC_BOOKMARK_BAR_OPEN_ALL:
      case IDC_BOOKMARK_BAR_OPEN_ALL_INCOGNITO:
      case IDC_BOOKMARK_BAR_OPEN_ALL_NEW_TAB_GROUP:
-@@ -624,8 +653,8 @@ bool BookmarkContextMenuController::IsCommandIdEnabled(int command_id) const {
-     case IDC_BOOKMARK_BAR_OPEN_SPLIT_VIEW: {
-       tabs::TabInterface* active_tab =
-           browser_ ? browser_->GetActiveTabInterface() : nullptr;
--      return bookmarks::HasBookmarkURLs(selection_) &&
--             active_tab && !active_tab->IsSplit();
-+      return bookmarks::HasBookmarkURLs(selection_) && active_tab &&
-+             !active_tab->IsSplit();
-     }
-     case IDC_BOOKMARK_BAR_OPEN_ALL_NEW_WINDOW:
-       return bookmarks::HasBookmarkURLs(selection_) &&
 diff --git a/chrome/browser/ui/webui/side_panel/bookmarks/bookmarks_page_handler.cc b/chrome/browser/ui/webui/side_panel/bookmarks/bookmarks_page_handler.cc
-index 2531c17..8eb9944 100644
+index 2531c17..a7e9171 100644
 --- a/chrome/browser/ui/webui/side_panel/bookmarks/bookmarks_page_handler.cc
 +++ b/chrome/browser/ui/webui/side_panel/bookmarks/bookmarks_page_handler.cc
 @@ -124,6 +124,14 @@ class BookmarksPageHandler::BookmarkContextMenu
@@ -125,27 +117,19 @@ index 2531c17..8eb9944 100644
      AddSeparator(ui::NORMAL_SEPARATOR);
  
      AddItem((bookmarks.size() == 1 && bookmarks.front()->is_folder()) ||
-@@ -951,7 +959,6 @@ void BookmarksPageHandler::BookmarkNodeChanged(
-                                node->is_url() ? node->url().spec() : "");
- }
- 
--std::string GetFolderSidePanelIDForTesting(
--    const BookmarkParentFolder& folder) {
-+std::string GetFolderSidePanelIDForTesting(const BookmarkParentFolder& folder) {
-   return GetFolderSidePanelID(folder);
- }
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
-index 263f995..761e563 100644
+index 263f995..9c18c04 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -4213,6 +4213,10 @@ static_library("browser") {
-       "//roamux/browser/ui/webui/chord_display.mm",
-       "//roamux/browser/ui/webui/roamux_shortcuts_handler.cc",
-       "//roamux/browser/ui/webui/roamux_shortcuts_handler.h",
-+      # Roamux (roam-208): bookmark subfolders -> tab groups (mac-only
-+      # product; mac block keeps this off Android by construction).
+@@ -2483,6 +2483,11 @@ static_library("browser") {
+     ]
+ 
+     sources += [
++      # Roamux (roam-208): bookmark subfolders -> tab groups. Desktop-only
++      # (this is the !is_android branch); referenced by the patched bookmark
++      # context menu controller on every desktop platform.
 +      "//roamux/browser/bookmarks/subfolder_tab_groups.cc",
 +      "//roamux/browser/bookmarks/subfolder_tab_groups.h",
-       "icon_loader_mac.mm",
-       "memory_details_mac.cc",
-       "platform_util_mac.mm",
+       "apps/intent_helper/intent_chip_display_prefs.cc",
+       "apps/intent_helper/intent_chip_display_prefs.h",
+       "certificate_viewer.h",
